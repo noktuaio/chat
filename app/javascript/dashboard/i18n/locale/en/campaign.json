@@ -209,6 +209,10 @@
         "SUMMARY": "{delivered} of {audience} contacts received this campaign. {skipped} skipped and {failed} failed.",
         "RATE": "{value} of audience",
         "PAGE_INFO": "Page {current} of {total}",
+        "BREADCRUMB": {
+          "CAMPAIGNS": "Campaigns",
+          "WHATSAPP": "WhatsApp"
+        },
         "FILTERS": {
           "ALL": "All"
         },

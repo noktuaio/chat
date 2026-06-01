@@ -6,6 +6,7 @@ import { useStore, useStoreGetters } from 'dashboard/composables/store';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
+import Breadcrumb from 'dashboard/components-next/breadcrumb/Breadcrumb.vue';
 import CampaignsAPI from 'dashboard/api/campaigns';
 
 const { t } = useI18n();
@@ -30,6 +31,15 @@ const campaign = computed(() =>
     record => Number(record.id) === campaignId.value
   )
 );
+const campaignTitle = computed(
+  () => campaign.value?.title || `#${campaignId.value}`
+);
+
+const breadcrumbItems = computed(() => [
+  { label: t('CAMPAIGN.WHATSAPP.ANALYTICS.BREADCRUMB.CAMPAIGNS') },
+  { label: t('CAMPAIGN.WHATSAPP.ANALYTICS.BREADCRUMB.WHATSAPP') },
+  { label: campaignTitle.value },
+]);
 
 const statusOptions = computed(() => [
   { key: 'all', label: t('CAMPAIGN.WHATSAPP.ANALYTICS.FILTERS.ALL') },
@@ -179,6 +189,10 @@ const goBack = () => {
   router.push({ name: 'campaigns_whatsapp_index' });
 };
 
+const handleBreadcrumbClick = () => {
+  goBack();
+};
+
 onMounted(() => {
   store.dispatch('campaigns/get');
   fetchMetrics();
@@ -193,37 +207,31 @@ watch(
 
 <template>
   <section class="flex h-full flex-col overflow-hidden bg-n-surface-1">
-    <header
-      class="sticky top-0 z-10 border-b border-n-weak bg-n-surface-1 px-6"
-    >
-      <div class="mx-auto flex h-20 w-full max-w-7xl items-center gap-3">
-        <Button
-          variant="ghost"
-          color="slate"
-          size="sm"
-          icon="i-lucide-arrow-left"
-          :title="t('CAMPAIGN.WHATSAPP.ANALYTICS.BACK')"
-          @click="goBack"
-        />
-        <div class="min-w-0">
-          <h1 class="text-heading-1 text-n-slate-12">
-            {{ t('CAMPAIGN.WHATSAPP.ANALYTICS.TITLE') }}
-          </h1>
-          <p class="mt-1 truncate text-sm text-n-slate-11">
-            {{ campaign?.title || `#${campaignId}` }}
-          </p>
-          <div
-            v-if="campaign?.inbox?.name"
-            class="mt-1 flex flex-wrap items-center gap-2 text-xs text-n-slate-10"
-          >
-            <span>{{ campaign.inbox.name }}</span>
-          </div>
+    <header class="sticky top-0 z-10 px-6">
+      <div class="mx-auto w-full max-w-7xl">
+        <div class="flex w-full items-center py-7">
+          <Breadcrumb :items="breadcrumbItems" @click="handleBreadcrumbClick" />
         </div>
       </div>
     </header>
 
-    <main class="flex-1 overflow-y-auto px-6 py-6">
-      <div class="mx-auto w-full max-w-7xl">
+    <main class="flex-1 overflow-y-auto px-6">
+      <div class="mx-auto w-full max-w-7xl py-4">
+        <div class="mb-6 min-w-0">
+          <h1 class="text-heading-1 text-n-slate-12">
+            {{ t('CAMPAIGN.WHATSAPP.ANALYTICS.TITLE') }}
+          </h1>
+          <p class="mt-1 truncate text-sm text-n-slate-11">
+            {{ campaignTitle }}
+            <span
+              v-if="campaign?.inbox?.name"
+              class="before:mx-1 before:text-n-slate-10 before:content-['·']"
+            >
+              {{ campaign.inbox.name }}
+            </span>
+          </p>
+        </div>
+
         <div
           v-if="state.isFetchingMetrics"
           class="flex h-24 items-center justify-center text-n-slate-11"
