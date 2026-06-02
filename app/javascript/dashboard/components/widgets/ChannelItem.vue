@@ -52,13 +52,22 @@ const isActive = computed(() => {
     return props.enabledFeatures.channel_tiktok && hasTiktokConfigured.value;
   }
 
+  if (key === 'voice') {
+    return props.enabledFeatures.channel_voice;
+  }
+
+  if (key === 'whatsapp_call') {
+    return (
+      props.enabledFeatures.channel_voice &&
+      !!window.chatwootConfig?.whatsappAppId &&
+      window.chatwootConfig.whatsappAppId !== 'none'
+    );
+  }
+  
   if (key === 'app_store') {
     return props.enabledFeatures.channel_app_store;
   }
 
-  if (key === 'voice') {
-    return props.enabledFeatures.channel_voice;
-  }
 
   return [
     'website',
@@ -82,7 +91,14 @@ const isComingSoon = computed(() => {
 });
 
 const isBeta = computed(() => {
-  return ['tiktok', 'app_store', 'voice'].includes(props.channel.key);
+  return ['tiktok', 'voice', 'whatsapp_call', 'app_store'].includes(props.channel.key);
+});
+
+const hasVoiceBadge = computed(() => {
+  return (
+    ['voice', 'whatsapp_call'].includes(props.channel.key) &&
+    !!props.enabledFeatures.channel_voice
+  );
 });
 
 const onItemClick = () => {
@@ -99,6 +115,7 @@ const onItemClick = () => {
     :icon="channel.icon"
     :is-coming-soon="isComingSoon"
     :is-beta="isBeta"
+    :has-voice-badge="hasVoiceBadge"
     :disabled="!isActive"
     @click="onItemClick"
   />
