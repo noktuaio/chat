@@ -117,15 +117,19 @@ const CHANNEL_LIST = [
     inbox: { channel_type: 'Channel::Line' },
     form: true,
   },
+  // Email channels (including Gmail/Outlook OAuth) are disabled for this phase;
+  // they will be enabled in a future PR.
   {
     type: 'gmail',
     label: 'Gmail',
     inbox: { channel_type: 'Channel::Email', provider: 'google' },
+    disabled: true,
   },
   {
     type: 'outlook',
     label: 'Outlook',
     inbox: { channel_type: 'Channel::Email', provider: 'microsoft' },
+    disabled: true,
   },
   {
     type: 'telegram',

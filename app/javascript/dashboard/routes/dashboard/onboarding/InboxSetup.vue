@@ -106,7 +106,11 @@ const detectedEmailChannel = computed(() => {
 });
 
 const displayedChannels = computed(() =>
-  [detectedEmailChannel.value, ...connectedChannels.value].filter(Boolean)
+  [detectedEmailChannel.value, ...connectedChannels.value]
+    .filter(Boolean)
+    // Email channels (including Gmail/Outlook OAuth) are disabled for this
+    // phase; they will be enabled in a future PR.
+    .filter(channel => channel.type !== 'email')
 );
 
 const remainingChannels = computed(() => {
