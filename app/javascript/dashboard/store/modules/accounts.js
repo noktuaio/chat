@@ -19,6 +19,7 @@ const state = {
     isUpdating: false,
     isCheckoutInProcess: false,
     isFetchingLimits: false,
+    isSwitchingCurrency: false,
   },
 };
 
@@ -139,6 +140,20 @@ export const actions = {
       throwErrorMessage(error);
     } finally {
       commit(types.default.SET_ACCOUNT_UI_FLAG, { isCheckoutInProcess: false });
+    }
+  },
+
+  switchBillingCurrency: async ({ commit, dispatch }, { currency }) => {
+    commit(types.default.SET_ACCOUNT_UI_FLAG, { isSwitchingCurrency: true });
+    try {
+      await EnterpriseAccountAPI.switchCurrency(currency);
+      // Refresh the account so custom_attributes.billing_currency and the
+      // subscription details reflect the new currency.
+      await dispatch('get', { silent: true });
+    } catch (error) {
+      throwErrorMessage(error);
+    } finally {
+      commit(types.default.SET_ACCOUNT_UI_FLAG, { isSwitchingCurrency: false });
     }
   },
 

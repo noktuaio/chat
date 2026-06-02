@@ -2,7 +2,7 @@ class Enterprise::Api::V1::AccountsController < Api::BaseController
   include BillingHelper
   before_action :fetch_account
   before_action :check_authorization
-  before_action :check_cloud_env, only: [:limits, :toggle_deletion, :topup_options]
+  before_action :check_cloud_env, only: [:limits, :toggle_deletion, :topup_options, :switch_currency]
 
   def subscription
     if stripe_customer_id.blank? && @account.custom_attributes['is_creating_customer'].blank?
@@ -74,6 +74,17 @@ class Enterprise::Api::V1::AccountsController < Api::BaseController
   def topup_options
     service = Enterprise::Billing::TopupCheckoutService.new(account: @account)
     render json: { id: @account.id, currency: @account.billing_currency, options: service.available_options }
+  end
+
+  def switch_currency
+    return render json: { error: I18n.t('errors.billing.currency_required') }, status: :unprocessable_entity if params[:currency].blank?
+
+    Enterprise::Billing::SwitchCurrencyService.new(account: @account, currency: params[:currency]).perform
+
+    @account.reload
+    render json: { id: @account.id, limits: @account.limits, custom_attributes: @account.custom_attributes }
+  rescue Enterprise::Billing::SwitchCurrencyService::Error, Stripe::StripeError => e
+    render_could_not_create_error(e.message)
   end
 
   private

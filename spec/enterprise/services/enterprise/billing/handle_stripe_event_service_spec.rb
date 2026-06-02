@@ -36,6 +36,7 @@ describe Enterprise::Billing::HandleStripeEventService do
     allow(subscription).to receive(:[]).with('quantity').and_return('10')
     allow(subscription).to receive(:[]).with('status').and_return('active')
     allow(subscription).to receive(:[]).with('current_period_end').and_return(1_686_567_520)
+    allow(subscription).to receive(:[]).with('metadata').and_return({})
     allow(subscription).to receive(:customer).and_return('cus_123')
     allow(event).to receive(:type).and_return('customer.subscription.updated')
   end

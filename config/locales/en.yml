@@ -166,6 +166,14 @@ en:
       plan_not_eligible: Top-ups are only available for paid plans. Please upgrade your plan first.
       stripe_customer_not_configured: Stripe customer not configured
       no_payment_method: No payment methods found. Please add a payment method before making a purchase.
+    billing:
+      currency_required: Currency is required
+      unsupported_currency: This currency is not supported
+      same_currency: This account is already billed in the selected currency
+      stripe_customer_not_configured: Stripe customer not configured
+      unknown_plan: Could not determine the current plan
+      currency_not_available_for_plan: The selected currency is not available for your current plan
+      no_payment_method: No payment methods found. Please add a payment method before switching currency.
     reports:
       date_range_too_long: Date range cannot exceed 6 months
   profile:

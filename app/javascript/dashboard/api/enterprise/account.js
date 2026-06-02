@@ -32,6 +32,10 @@ class EnterpriseAccountAPI extends ApiClient {
   getTopupOptions() {
     return axios.get(`${this.url}topup_options`);
   }
+
+  switchCurrency(currency) {
+    return axios.post(`${this.url}switch_currency`, { currency });
+  }
 }
 
 export default new EnterpriseAccountAPI();

@@ -524,6 +524,7 @@ Rails.application.routes.draw do
               post :toggle_deletion
               post :topup_checkout
               get :topup_options
+              post :switch_currency
             end
           end
         end

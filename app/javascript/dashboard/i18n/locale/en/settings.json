@@ -447,6 +447,23 @@
       "DESCRIPTION": "View your previous invoices, edit your billing details, or cancel your subscription.",
       "BUTTON_TXT": "Go to the billing portal"
     },
+    "CURRENCY": {
+      "TITLE": "Billing currency",
+      "DESCRIPTION": "Choose the currency used for your subscription and credit purchases.",
+      "OPTIONS": {
+        "USD": "US Dollar (USD)",
+        "BRL": "Brazilian Real (BRL)"
+      },
+      "SUCCESS": "Billing currency updated successfully.",
+      "ERROR": "Failed to update billing currency. Please try again.",
+      "CONFIRM": {
+        "TITLE": "Switch billing currency?",
+        "DESCRIPTION": "You are about to switch your billing currency to {currency}.",
+        "WARNING": "Your current subscription will be cancelled and a new one will be started in the selected currency. Pricing and any remaining credits may differ. This cannot be undone automatically.",
+        "CONFIRM_BUTTON": "Switch currency",
+        "CANCEL_BUTTON": "Cancel"
+      }
+    },
     "CAPTAIN": {
       "TITLE": "Captain",
       "DESCRIPTION": "Manage usage and credits for Captain AI.",

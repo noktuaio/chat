@@ -12,7 +12,7 @@ class Enterprise::Billing::HandleStripeEventService
     @event = event
 
     case @event.type
-    when 'customer.subscription.updated'
+    when 'customer.subscription.created', 'customer.subscription.updated'
       process_subscription_updated
     when 'customer.subscription.deleted'
       process_subscription_deleted
@@ -28,6 +28,10 @@ class Enterprise::Billing::HandleStripeEventService
 
     # skipping self hosted plan events
     return if plan.blank? || account.blank?
+    # A subscription tagged for a currency switch is being cancelled by
+    # SwitchCurrencyService, which writes the final state itself — ignore its
+    # interim webhook events so they don't overwrite the new currency.
+    return if currency_switch_cancellation?
 
     previous_usage = capture_previous_usage
     update_account_attributes(subscription, plan)
@@ -77,9 +81,17 @@ class Enterprise::Billing::HandleStripeEventService
     inferred_currency || account.billing_currency
   end
 
+  def currency_switch_cancellation?
+    subscription['metadata'][Enterprise::Billing::SwitchCurrencyService::SWITCH_METADATA_KEY] == 'true'
+  end
+
   def process_subscription_deleted
     # skipping self hosted plan events
     return if account.blank?
+    # A currency switch cancels the old subscription itself and creates the new
+    # one. Don't re-subscribe the default plan here — it would create a stray
+    # default-plan sub and block the new currency ("cannot combine currencies").
+    return if currency_switch_cancellation?
 
     previous_monthly_credits = current_plan_credits[:responses]
     return unless Enterprise::Billing::CreateStripeCustomerService.new(account: account).perform

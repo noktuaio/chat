@@ -1,22 +1,32 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useMapGetter, useStore } from 'dashboard/composables/store.js';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { useCaptain } from 'dashboard/composables/useCaptain';
+import { useAlert } from 'dashboard/composables';
 import { format } from 'date-fns';
 import sessionStorage from 'shared/helpers/sessionStorage';
+import {
+  SUPPORTED_BILLING_CURRENCIES,
+  DEFAULT_BILLING_CURRENCY,
+  getCurrencyConfig,
+} from 'dashboard/constants/billing';
 
 import BillingMeter from './components/BillingMeter.vue';
 import BillingCard from './components/BillingCard.vue';
 import BillingHeader from './components/BillingHeader.vue';
 import DetailItem from './components/DetailItem.vue';
 import PurchaseCreditsModal from './components/PurchaseCreditsModal.vue';
+import SwitchCurrencyDialog from './components/SwitchCurrencyDialog.vue';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import SettingsLayout from '../SettingsLayout.vue';
+import TabBar from 'dashboard/components-next/tabbar/TabBar.vue';
 import ButtonV4 from 'next/button/Button.vue';
 
 const router = useRouter();
+const { t } = useI18n();
 const { currentAccount, isOnChatwootCloud } = useAccount();
 const {
   captainEnabled,
@@ -118,6 +128,55 @@ const handleBillingPageLogic = async () => {
   }
 };
 
+const isSwitchingCurrency = computed(() => uiFlags.value.isSwitchingCurrency);
+
+// Currency switching is rolled out to Brazil (pt_BR) accounts only for now.
+const showCurrencyToggle = computed(
+  () => currentAccount.value?.locale === 'pt_BR'
+);
+
+const currentBillingCurrency = computed(() =>
+  (
+    customAttributes.value.billing_currency || DEFAULT_BILLING_CURRENCY
+  ).toLowerCase()
+);
+
+const currencyTabs = computed(() =>
+  SUPPORTED_BILLING_CURRENCIES.map(code => ({
+    label: t(getCurrencyConfig(code).i18nLabelKey),
+    value: code,
+  }))
+);
+
+const activeCurrencyIndex = computed(() => {
+  const index = SUPPORTED_BILLING_CURRENCIES.indexOf(
+    currentBillingCurrency.value
+  );
+  return index === -1 ? 0 : index;
+});
+
+const pendingCurrency = ref(null);
+const switchCurrencyDialogRef = ref(null);
+
+const onSelectCurrency = tab => {
+  if (!tab?.value || tab.value === currentBillingCurrency.value) return;
+  if (isSwitchingCurrency.value) return;
+  pendingCurrency.value = tab.value;
+  switchCurrencyDialogRef.value?.open();
+};
+
+const onConfirmSwitchCurrency = async () => {
+  try {
+    await store.dispatch('accounts/switchBillingCurrency', {
+      currency: pendingCurrency.value,
+    });
+    switchCurrencyDialogRef.value?.close();
+    useAlert(t('BILLING_SETTINGS.CURRENCY.SUCCESS'));
+  } catch (error) {
+    useAlert(error.message || t('BILLING_SETTINGS.CURRENCY.ERROR'));
+  }
+};
+
 const onClickBillingPortal = () => {
   store.dispatch('accounts/checkout');
 };
@@ -191,6 +250,23 @@ onMounted(handleBillingPageLogic);
           </div>
         </BillingCard>
         <BillingCard
+          v-if="showCurrencyToggle"
+          :title="$t('BILLING_SETTINGS.CURRENCY.TITLE')"
+          :description="$t('BILLING_SETTINGS.CURRENCY.DESCRIPTION')"
+        >
+          <template #action>
+            <div
+              :class="{ 'pointer-events-none opacity-60': isSwitchingCurrency }"
+            >
+              <TabBar
+                :tabs="currencyTabs"
+                :initial-active-tab="activeCurrencyIndex"
+                @tab-changed="onSelectCurrency"
+              />
+            </div>
+          </template>
+        </BillingCard>
+        <BillingCard
           v-if="captainEnabled"
           :title="$t('BILLING_SETTINGS.CAPTAIN.TITLE')"
           :description="$t('BILLING_SETTINGS.CAPTAIN.DESCRIPTION')"
@@ -262,6 +338,12 @@ onMounted(handleBillingPageLogic);
       <PurchaseCreditsModal
         ref="purchaseCreditsModalRef"
         @success="handleTopupSuccess"
+      />
+      <SwitchCurrencyDialog
+        ref="switchCurrencyDialogRef"
+        :target-currency="pendingCurrency"
+        :is-loading="isSwitchingCurrency"
+        @confirm="onConfirmSwitchCurrency"
       />
     </template>
   </SettingsLayout>

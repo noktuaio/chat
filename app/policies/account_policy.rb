@@ -38,4 +38,8 @@ class AccountPolicy < ApplicationPolicy
   def topup_options?
     @account_user.administrator?
   end
+
+  def switch_currency?
+    @account_user.administrator?
+  end
 end
