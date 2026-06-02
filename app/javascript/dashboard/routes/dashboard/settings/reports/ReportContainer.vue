@@ -7,13 +7,34 @@ import format from 'date-fns/format';
 import { formatTime } from '@chatwoot/utils';
 import ChartStats from './components/ChartElements/ChartStats.vue';
 import BarChart from 'shared/components/charts/BarChart.vue';
+import ReportDrilldownDrawer from './components/ReportDrilldownDrawer.vue';
 
 export default {
-  components: { ChartStats, BarChart },
+  components: { ChartStats, BarChart, ReportDrilldownDrawer },
   props: {
     groupBy: {
       type: Object,
       default: () => ({}),
+    },
+    from: {
+      type: Number,
+      default: 0,
+    },
+    to: {
+      type: Number,
+      default: 0,
+    },
+    reportType: {
+      type: String,
+      default: 'account',
+    },
+    selectedItemId: {
+      type: [String, Number],
+      default: null,
+    },
+    businessHours: {
+      type: Boolean,
+      default: false,
     },
     accountSummaryKey: {
       type: String,
@@ -41,6 +62,11 @@ export default {
       props.accountSummaryKey
     );
     return { calculateTrend, isAverageMetricType };
+  },
+  data() {
+    return {
+      drilldownRequest: null,
+    };
   },
   computed: {
     ...mapGetters({
@@ -139,6 +165,40 @@ export default {
 
       return options;
     },
+    isDrilldownEnabled() {
+      return !!(this.from && this.to);
+    },
+    onChartElementClick(metric, event) {
+      if (!this.isDrilldownEnabled()) return;
+
+      const dataPoint = this.accountReport.data[metric.KEY]?.[event.dataIndex];
+      if (!this.canOpenDrilldown(metric, dataPoint)) return;
+
+      this.drilldownRequest = {
+        metric: metric.KEY,
+        metricName: metric.NAME,
+        bucketLabel: event.label,
+        bucketTimestamp: dataPoint.timestamp,
+        from: this.from,
+        to: this.to,
+        type: this.reportType,
+        id: this.selectedItemId,
+        groupBy: this.groupBy?.period,
+        businessHours: this.businessHours,
+      };
+    },
+    canOpenDrilldown(metric, dataPoint) {
+      if (!dataPoint) return false;
+
+      if (this.isAverageMetricType(metric.KEY)) {
+        return dataPoint.count > 0;
+      }
+
+      return dataPoint.value > 0;
+    },
+    closeDrilldown() {
+      this.drilldownRequest = null;
+    },
   },
 };
 </script>
@@ -168,6 +228,8 @@ export default {
             v-if="accountReport.data[metric.KEY].length"
             :collection="getCollection(metric)"
             :chart-options="getChartOptions(metric)"
+            :clickable="isDrilldownEnabled()"
+            @element-click="onChartElementClick(metric, $event)"
           />
           <span v-else class="text-sm text-n-slate-10">
             {{ $t('REPORT.NO_ENOUGH_DATA') }}
@@ -176,4 +238,5 @@ export default {
       </div>
     </div>
   </div>
+  <ReportDrilldownDrawer :request="drilldownRequest" @close="closeDrilldown" />
 </template>

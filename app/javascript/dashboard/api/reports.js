@@ -31,6 +31,35 @@ class ReportsAPI extends ApiClient {
     });
   }
 
+  getDrilldown({
+    metric,
+    bucketTimestamp,
+    from,
+    to,
+    type = 'account',
+    id,
+    groupBy,
+    businessHours,
+    page,
+    perPage,
+  }) {
+    return axios.get(`${this.url}/drilldown`, {
+      params: {
+        metric,
+        bucket_timestamp: bucketTimestamp,
+        since: from,
+        until: to,
+        type,
+        id,
+        group_by: groupBy,
+        business_hours: businessHours,
+        timezone_offset: getTimeOffset(),
+        page,
+        per_page: perPage,
+      },
+    });
+  }
+
   // eslint-disable-next-line default-param-last
   getSummary(since, until, type = 'account', id, groupBy, businessHours) {
     return axios.get(`${this.url}/summary`, {

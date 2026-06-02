@@ -121,6 +121,21 @@
       "CLEAR_FILTER": "Clear filter",
       "EMPTY_LIST": "No results found"
     },
+    "DRILLDOWN": {
+      "TITLE": "{metric} details",
+      "RESULT_COUNT": "{count} records",
+      "EMPTY": "No records found for this bar.",
+      "ERROR": "Could not load records. Please try again.",
+      "LOAD_MORE": "Load more",
+      "CLOSE": "Close details",
+      "UNKNOWN_CONTACT": "Unknown contact",
+      "UNKNOWN_INBOX": "Unknown inbox",
+      "UNASSIGNED_AGENT": "Unassigned",
+      "NO_MESSAGE_CONTENT": "No message content",
+      "MESSAGE_CREATED_AT": "Message created at {time}",
+      "INCOMING_MESSAGE": "Incoming message",
+      "OUTGOING_MESSAGE": "Outgoing message"
+    },
     "PAGINATION": {
       "RESULTS": "Showing {start} to {end} of {total} results",
       "PER_PAGE_TEMPLATE": "{size} / page"

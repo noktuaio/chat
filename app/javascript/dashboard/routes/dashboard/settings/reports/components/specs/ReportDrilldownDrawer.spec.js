@@ -1,0 +1,137 @@
+import { flushPromises, mount } from '@vue/test-utils';
+import ReportsAPI from 'dashboard/api/reports';
+import ReportDrilldownDrawer from '../ReportDrilldownDrawer.vue';
+
+vi.mock('dashboard/api/reports', () => ({
+  default: {
+    getDrilldown: vi.fn(),
+  },
+}));
+
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key, params = {}) => {
+      if (key === 'REPORT.DRILLDOWN.TITLE') {
+        return `${params.metric} details`;
+      }
+      if (key === 'REPORT.DRILLDOWN.RESULT_COUNT') {
+        return `${params.count} records`;
+      }
+      return key;
+    },
+  }),
+}));
+
+describe('ReportDrilldownDrawer.vue', () => {
+  const request = {
+    metric: 'incoming_messages_count',
+    metricName: 'Messages received',
+    bucketLabel: '20-May',
+    bucketTimestamp: 1621103400,
+    from: 1621103400,
+    to: 1621621800,
+    type: 'account',
+    groupBy: 'day',
+    businessHours: false,
+  };
+
+  const payload = [
+    {
+      record_type: 'message',
+      conversation: {
+        id: 10,
+        display_id: 42,
+        contact_id: 11,
+        contact_name: 'Jane',
+        inbox_id: 12,
+        inbox_name: 'Website',
+        assignee_id: 13,
+        assignee_name: 'Alex',
+        status: 'open',
+        created_at: 1621103400,
+        last_activity_at: 1621103700,
+        last_message: {
+          id: 100,
+          content: 'Latest reply',
+          message_type: 'outgoing',
+          created_at: 1621103600,
+        },
+      },
+      message: {
+        id: 99,
+        content: 'Need help',
+        message_type: 'incoming',
+        created_at: 1621103500,
+      },
+      metric_value: null,
+      occurred_at: 1621103500,
+    },
+  ];
+
+  const mountDrawer = () =>
+    mount(ReportDrilldownDrawer, {
+      props: { request },
+      global: {
+        stubs: {
+          Teleport: true,
+          Transition: false,
+          Spinner: true,
+          Button: {
+            props: ['label'],
+            template:
+              '<button @click="$emit(\'click\')">{{ label }}<slot /></button>',
+          },
+          ReportDrilldownCard: {
+            props: ['record'],
+            template:
+              '<div data-testid="drilldown-card">#{{ record.conversation.display_id }}</div>',
+          },
+        },
+        mocks: {
+          $t: key => key,
+        },
+      },
+    });
+
+  beforeEach(() => {
+    ReportsAPI.getDrilldown.mockResolvedValue({
+      data: {
+        meta: {
+          total_count: 1,
+          current_page: 1,
+        },
+        payload,
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it('loads and renders drilldown cards for the request', async () => {
+    const wrapper = mountDrawer();
+    await flushPromises();
+
+    expect(ReportsAPI.getDrilldown).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metric: 'incoming_messages_count',
+        bucketTimestamp: 1621103400,
+        page: 1,
+      })
+    );
+    expect(wrapper.text()).toContain('Messages received details');
+    expect(wrapper.text()).toContain('1 records');
+    expect(wrapper.find('[data-testid="drilldown-card"]').text()).toBe('#42');
+  });
+
+  it('emits close when the drawer close button is clicked', async () => {
+    const wrapper = mountDrawer();
+    await flushPromises();
+
+    await wrapper.find('button').trigger('click');
+
+    expect(wrapper.emitted('close')).toBeTruthy();
+  });
+});
