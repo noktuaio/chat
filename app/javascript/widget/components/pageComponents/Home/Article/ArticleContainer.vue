@@ -7,7 +7,10 @@ import { useRouter } from 'vue-router';
 import { useStore } from 'dashboard/composables/store';
 import { useMapGetter } from 'dashboard/composables/store.js';
 import { useDarkMode } from 'widget/composables/useDarkMode';
-import { getMatchingLocale } from 'shared/helpers/portalHelper';
+import {
+  getMatchingLocale,
+  buildArticleViewerLink,
+} from 'shared/helpers/portalHelper';
 
 const store = useStore();
 const router = useRouter();
@@ -38,14 +41,11 @@ const fetchArticles = () => {
 };
 
 const openArticleInArticleViewer = link => {
-  const params = new URLSearchParams({
-    show_plain_layout: 'true',
-    theme: prefersDarkMode.value ? 'dark' : 'light',
-    ...(locale.value && { locale: locale.value }),
+  const linkToOpen = buildArticleViewerLink({
+    link,
+    locale: locale.value,
+    prefersDarkMode: prefersDarkMode.value,
   });
-
-  // Combine link with query parameters
-  const linkToOpen = `${link}?${params.toString()}`;
   router.push({ name: 'article-viewer', query: { link: linkToOpen } });
 };
 

@@ -38,3 +38,24 @@ export const getMatchingLocale = (selectedLocale = '', allowedLocales = []) => {
   // Return the first match that exists in the allowed list, or null
   return priorityMatches.find(l => l && allowedLocales.includes(l)) ?? null;
 };
+
+/**
+ * Build the link consumed by the in-widget article viewer, appending the query
+ * params it expects (plain layout, theme and locale).
+ *
+ * @export
+ * @param {Object} options
+ * @param {string} options.link Relative article/portal path (e.g. `hc/slug/articles/foo`).
+ * @param {(string|null)} [options.locale] Resolved portal locale.
+ * @param {boolean} [options.prefersDarkMode] Whether the widget is in dark mode.
+ * @returns {string} The link with the article viewer query params appended.
+ */
+export const buildArticleViewerLink = ({ link, locale, prefersDarkMode }) => {
+  const params = new URLSearchParams({
+    show_plain_layout: 'true',
+    theme: prefersDarkMode ? 'dark' : 'light',
+    ...(locale && { locale }),
+  });
+
+  return `${link}?${params.toString()}`;
+};
