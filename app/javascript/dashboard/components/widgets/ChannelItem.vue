@@ -63,11 +63,10 @@ const isActive = computed(() => {
       window.chatwootConfig.whatsappAppId !== 'none'
     );
   }
-  
+
   if (key === 'app_store') {
     return props.enabledFeatures.channel_app_store;
   }
-
 
   return [
     'website',
@@ -91,7 +90,9 @@ const isComingSoon = computed(() => {
 });
 
 const isBeta = computed(() => {
-  return ['tiktok', 'voice', 'whatsapp_call', 'app_store'].includes(props.channel.key);
+  return ['tiktok', 'voice', 'whatsapp_call', 'app_store'].includes(
+    props.channel.key
+  );
 });
 
 const hasVoiceBadge = computed(() => {
