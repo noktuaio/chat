@@ -1,5 +1,5 @@
 # Resolves Stripe price ids from CHATWOOT_CLOUD_PLANS per currency.
-# A plan's `price_ids` may be a currency-keyed Hash, or a legacy Array/String (treated as usd).
+# A plan's `price_ids` may be a currency-keyed Hash, or a legacy Array (treated as usd).
 module Enterprise::Billing::PlanConfiguration
   CLOUD_PLANS_CONFIG = 'CHATWOOT_CLOUD_PLANS'.freeze
 
@@ -18,7 +18,6 @@ module Enterprise::Billing::PlanConfiguration
     case raw
     when Hash then raw.transform_keys { |key| Enterprise::Billing::Currencies.normalize(key) }
     when Array then { Enterprise::Billing::Currencies::DEFAULT => raw }
-    when String then { Enterprise::Billing::Currencies::DEFAULT => [raw] }
     else {}
     end
   end
