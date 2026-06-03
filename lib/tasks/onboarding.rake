@@ -42,6 +42,18 @@ namespace :onboarding do
     abort 'Aborted' unless $stdin.gets&.strip&.casecmp?('y')
 
     account.custom_attributes['onboarding_step'] = 'account_details'
+    # Seed the socials the website branding service would have detected so the
+    # onboarding inbox setup UI has channels to render. Mirrors the shape of
+    # WebsiteBrandingService#build_socials (keys map to SocialLinkParser).
+    account.custom_attributes['brand_info'] ||= {}
+    account.custom_attributes['brand_info']['socials'] = [
+      { 'type' => 'whatsapp', 'url' => 'https://wa.me/14155552671' },
+      { 'type' => 'facebook', 'url' => 'https://facebook.com/chatwoot' },
+      { 'type' => 'telegram', 'url' => 'https://t.me/chatwoot' },
+      { 'type' => 'instagram', 'url' => 'https://instagram.com/chatwoot' },
+      { 'type' => 'line', 'url' => 'https://line.me/chatwoot' },
+      { 'type' => 'tiktok', 'url' => 'https://tiktok.com/@chatwoot' }
+    ]
     account.save!
 
     account.inboxes.destroy_all
