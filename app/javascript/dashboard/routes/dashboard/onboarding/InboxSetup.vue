@@ -9,10 +9,10 @@ import { useConfig } from 'dashboard/composables/useConfig';
 import { useHelpCenterGenerationStore } from 'dashboard/stores/helpCenterGeneration';
 import { ONBOARDING_EVENTS } from 'dashboard/helper/AnalyticsHelper/events';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
-import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import OnboardingLayout from './OnboardingLayout.vue';
 import OnboardingSection from './OnboardingSection.vue';
 import InboxChannelsDialog from './InboxChannelsDialog.vue';
+import InboxChannelsFooter from './InboxChannelsFooter.vue';
 import ChannelRow from './ChannelRow.vue';
 import WebWidgetCreationStatus from './WebWidgetCreationStatus.vue';
 import HelpCenterCreationStatus from './HelpCenterCreationStatus.vue';
@@ -223,41 +223,11 @@ const connectChannel = channel => {
         :class="{ 'border-t border-n-weak': index > 0 }"
         @connect="connectChannel"
       />
-      <div
-        class="flex items-center justify-between gap-3 px-3 py-3"
+      <InboxChannelsFooter
+        :remaining-channels="remainingChannels"
         :class="{ 'border-t border-n-weak': displayedChannels.length > 0 }"
-      >
-        <div class="flex items-center gap-2 min-w-0">
-          <Icon
-            icon="i-lucide-info"
-            class="size-4 text-n-slate-9 flex-shrink-0"
-          />
-          <span class="text-sm text-n-slate-11">
-            {{ t('ONBOARDING_INBOX_SETUP.CHANNELS.MORE_CHANNELS_NOTE') }}
-          </span>
-        </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <template v-if="remainingChannels.length">
-            <div class="flex items-center gap-1">
-              <ChannelIcon
-                v-for="channel in remainingChannels"
-                :key="channel.type"
-                :inbox="channel.inbox"
-                use-brand-icon
-                class="size-4"
-              />
-            </div>
-            <span class="w-px h-4 bg-n-weak" />
-          </template>
-          <button
-            type="button"
-            class="text-sm font-medium text-n-blue-11 hover:underline"
-            @click="openChannelsDialog"
-          >
-            {{ t('ONBOARDING_INBOX_SETUP.CHANNELS.VIEW_ALL') }}
-          </button>
-        </div>
-      </div>
+        @view-all="openChannelsDialog"
+      />
     </OnboardingSection>
 
     <!-- Disabled for this phase; integrations will be implemented later. -->
