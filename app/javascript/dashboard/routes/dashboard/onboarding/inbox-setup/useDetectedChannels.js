@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useAccount } from 'dashboard/composables/useAccount';
 import { SOCIAL_PLATFORMS, EMAIL_PROVIDERS } from './constants';
+import { findConnectedInbox } from './channelMatchers';
 
 // Pull the handle/username out of a detected social URL, formatted per channel.
 const extractHandle = ({ type, url }) => {
@@ -54,17 +55,10 @@ export function useDetectedChannels() {
     };
   });
 
-  // The real inbox backing a channel, if one exists — a connected inbox sharing
-  // its channel_type. Gmail and Outlook both use Channel::Email, so for email we
-  // also match on provider. Returned (not just a boolean) so the row can show
-  // the actual connected account's name rather than the detected handle.
+  // The real inbox backing a channel, if one exists — returned (not just a
+  // boolean) so the row can show the connected account's real name.
   const connectedInbox = channel =>
-    inboxes.value.find(
-      inbox =>
-        inbox.channel_type === channel.inbox?.channel_type &&
-        (channel.inbox?.channel_type !== 'Channel::Email' ||
-          inbox.provider === channel.inbox?.provider)
-    );
+    findConnectedInbox(inboxes.value, channel.inbox);
 
   const displayedChannels = computed(() =>
     [detectedEmailChannel.value, ...connectedChannels.value]

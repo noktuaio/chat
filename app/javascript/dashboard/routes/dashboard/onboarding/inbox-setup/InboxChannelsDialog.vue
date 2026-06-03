@@ -7,6 +7,7 @@ import Icon from 'dashboard/components-next/icon/Icon.vue';
 import ChannelIcon from 'dashboard/components-next/icon/ChannelIcon.vue';
 import { useChannelConnect } from './useChannelConnect';
 import { CHANNEL_LIST } from './constants';
+import { isChannelConnected } from './channelMatchers';
 import InboxChannelForm from './InboxChannelForm.vue';
 import InboxFacebookForm from './InboxFacebookForm.vue';
 
@@ -111,16 +112,7 @@ const dialogDescription = computed(() => {
   return t('ONBOARDING_INBOX_SETUP.CHANNELS_DIALOG.CONNECT_SUBTITLE');
 });
 
-// A channel is connected when a real inbox shares its channel_type. Gmail and
-// Outlook both use Channel::Email, so for email we also match on provider.
-const isConnected = inbox =>
-  !!inbox &&
-  props.inboxes.some(
-    configured =>
-      configured.channel_type === inbox.channel_type &&
-      (inbox.channel_type !== 'Channel::Email' ||
-        configured.provider === inbox.provider)
-  );
+const isConnected = inbox => isChannelConnected(props.inboxes, inbox);
 
 const open = preselectType => {
   const entry = preselectType
