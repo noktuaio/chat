@@ -1,4 +1,4 @@
-namespace :onboarding do
+namespace :onboarding do # rubocop:disable Metrics/BlockLength
   # Resets onboarding for an account so the onboarding flow runs again.
   # Interactively prompts for an account ID, then resets the onboarding step
   # and deletes the account's inboxes and help center (portals, categories, articles).
