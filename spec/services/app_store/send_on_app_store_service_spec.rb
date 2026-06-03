@@ -79,6 +79,30 @@ RSpec.describe AppStore::SendOnAppStoreService do
       expect(exception_tracker).to have_received(:capture_exception)
     end
 
+    it 'marks the message as failed when the message is not plain outgoing text' do
+      message = create(
+        :message,
+        message_type: :outgoing,
+        content_type: :input_csat,
+        inbox: inbox,
+        conversation: conversation,
+        account: inbox.account,
+        content: 'Please rate this conversation'
+      )
+
+      allow(channel).to receive(:reply_to_review)
+
+      described_class.new(message: message).perform
+
+      expect(channel).not_to have_received(:reply_to_review)
+      expect(Messages::StatusUpdateService).to have_received(:new).with(
+        message,
+        'failed',
+        'Only outgoing text messages are supported for App Store reviews.'
+      )
+      expect(exception_tracker).to have_received(:capture_exception)
+    end
+
     it 'marks the message as failed when the feature is disabled' do
       account.disable_features!(:channel_app_store)
       message = create(:message, message_type: :outgoing, inbox: inbox, conversation: conversation, account: inbox.account, content: 'Thanks')

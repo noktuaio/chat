@@ -16,6 +16,7 @@ class AppStore::SendOnAppStoreService < Base::SendOnChannelService
   end
 
   def validate_message_support!
+    raise 'Only outgoing text messages are supported for App Store reviews.' unless message.outgoing? && message.text?
     raise 'Sending attachments is not supported for App Store reviews.' if message.attachments.any?
   end
 
