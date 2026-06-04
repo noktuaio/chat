@@ -13,7 +13,7 @@ module Llm::OpenAiConfig
     end
 
     def api_key
-      openai_only_api_key.presence || system_openai_api_key || legacy_openai_api_key
+      openai_only_api_key.presence || system_openai_api_key.presence || legacy_openai_api_key
     end
 
     def embedding_model
