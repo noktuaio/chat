@@ -700,7 +700,25 @@
           "MAKE_DEFAULT": "設為預設",
           "MOVE_TO_DRAFT": "移至草稿",
           "PUBLISH_LOCALE": "發佈語系",
+          "CUSTOMIZE_CONTENT": "Localize content",
           "DELETE": "刪除"
+        }
+      },
+      "CONTENT_DIALOG": {
+        "TITLE": "Localize content",
+        "DESCRIPTION": "Set values specific to this locale. Anything left blank falls back to the default locale.",
+        "NAME": {
+          "LABEL": "名稱"
+        },
+        "PAGE_TITLE": {
+          "LABEL": "頁面標題"
+        },
+        "HEADER_TEXT": {
+          "LABEL": "標頭文字"
+        },
+        "API": {
+          "SUCCESS_MESSAGE": "Locale content updated successfully",
+          "ERROR_MESSAGE": "Unable to update locale content. Try again."
         }
       },
       "ADD_LOCALE_DIALOG": {
