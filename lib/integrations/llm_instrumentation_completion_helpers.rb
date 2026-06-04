@@ -11,7 +11,6 @@ module Integrations::LlmInstrumentationCompletionHelpers
     span.set_attribute('embedding.requested_dimensions', params[:dimensions]) if params[:dimensions]
     span.set_attribute('embedding.input_length', params[:input]&.length || 0)
     span.set_attribute(ATTR_LANGFUSE_OBSERVATION_INPUT, params[:input].to_s)
-    set_common_span_metadata(span, params)
   end
 
   def set_audio_transcription_span_attributes(span, params)
@@ -19,7 +18,6 @@ module Integrations::LlmInstrumentationCompletionHelpers
     span.set_attribute(ATTR_GEN_AI_REQUEST_MODEL, params[:model] || 'whisper-1')
     span.set_attribute('audio.duration_seconds', params[:duration]) if params[:duration]
     span.set_attribute(ATTR_LANGFUSE_OBSERVATION_INPUT, params[:file_path].to_s) if params[:file_path]
-    set_common_span_metadata(span, params)
   end
 
   def set_moderation_span_attributes(span, params)
@@ -27,12 +25,6 @@ module Integrations::LlmInstrumentationCompletionHelpers
     span.set_attribute(ATTR_GEN_AI_REQUEST_MODEL, params[:model] || 'text-moderation-latest')
     span.set_attribute('moderation.input_length', params[:input]&.length || 0)
     span.set_attribute(ATTR_LANGFUSE_OBSERVATION_INPUT, params[:input].to_s)
-    set_common_span_metadata(span, params)
-  end
-
-  def set_common_span_metadata(span, params)
-    span.set_attribute(ATTR_LANGFUSE_USER_ID, params[:account_id].to_s) if params[:account_id]
-    span.set_attribute(ATTR_LANGFUSE_TAGS, [params[:feature_name]].to_json) if params[:feature_name]
   end
 
   def set_embedding_result_attributes(span, result)
