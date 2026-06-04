@@ -700,7 +700,25 @@
           "MAKE_DEFAULT": "ডিফল্ট করুন",
           "MOVE_TO_DRAFT": "Move to draft",
           "PUBLISH_LOCALE": "Publish locale",
+          "CUSTOMIZE_CONTENT": "Localize content",
           "DELETE": "মুছে ফেলুন"
+        }
+      },
+      "CONTENT_DIALOG": {
+        "TITLE": "Localize content",
+        "DESCRIPTION": "Set values specific to this locale. Anything left blank falls back to the default locale.",
+        "NAME": {
+          "LABEL": "নাম"
+        },
+        "PAGE_TITLE": {
+          "LABEL": "পৃষ্ঠার শিরোনাম"
+        },
+        "HEADER_TEXT": {
+          "LABEL": "হেডার টেক্সট"
+        },
+        "API": {
+          "SUCCESS_MESSAGE": "Locale content updated successfully",
+          "ERROR_MESSAGE": "Unable to update locale content. Try again."
         }
       },
       "ADD_LOCALE_DIALOG": {
