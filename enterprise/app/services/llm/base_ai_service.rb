@@ -6,7 +6,7 @@ class Llm::BaseAiService
   DEFAULT_MODEL = Llm::Config::DEFAULT_MODEL
   DEFAULT_TEMPERATURE = 1.0
 
-  attr_reader :model, :temperature
+  attr_reader :model, :provider, :temperature
 
   def initialize
     Llm::Config.initialize!

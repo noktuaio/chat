@@ -63,6 +63,20 @@ RSpec.describe Captain::Llm::AssistantChatService do
 
       expect(attributes['langfuse.observation.metadata.generation_stage']).to eq('tool_call')
     end
+
+    it 'uses the configured provider for generation spans when Azure deployment name looks like an OpenAI model' do
+      set_installation_config('CAPTAIN_LLM_PROVIDER', 'azure')
+      set_installation_config('CAPTAIN_OPEN_AI_MODEL', 'gpt-4o')
+      Llm::Config.reset!
+
+      service = described_class.new(assistant: assistant, conversation: conversation)
+      message = instance_double(RubyLLM::Message, content: 'Final answer', input_tokens: 10, output_tokens: 20, tool_calls: {})
+
+      attributes = service.send(:generation_attributes, mock_chat, message)
+
+      expect(attributes['gen_ai.provider.name']).to eq('azure')
+      expect(attributes['gen_ai.request.model']).to eq('gpt-4o')
+    end
   end
 
   describe 'provider compatibility' do

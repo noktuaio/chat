@@ -32,7 +32,7 @@ module Captain::ChatGenerationRecorder
 
   def generation_attributes(chat, message)
     {
-      ATTR_GEN_AI_PROVIDER => determine_provider(model),
+      ATTR_GEN_AI_PROVIDER => generation_provider,
       ATTR_GEN_AI_REQUEST_MODEL => model,
       ATTR_GEN_AI_REQUEST_TEMPERATURE => temperature,
       ATTR_GEN_AI_USAGE_INPUT_TOKENS => message.input_tokens,
@@ -45,6 +45,10 @@ module Captain::ChatGenerationRecorder
 
   def format_input_messages(chat)
     chat.messages[0...-1].map { |m| { role: m.role.to_s, content: m.content.to_s } }.to_json
+  end
+
+  def generation_provider
+    provider.presence || determine_provider(model)
   end
 
   def generation_stage(message)
