@@ -89,51 +89,53 @@ const connectChannel = channel => {
 </script>
 
 <template>
-  <OnboardingLayout
-    :greeting="t('ONBOARDING_INBOX_SETUP.GREETING')"
-    :subtitle="t('ONBOARDING_INBOX_SETUP.SUBTITLE')"
-    :continue-label="t('ONBOARDING_INBOX_SETUP.CONTINUE')"
-    :skip-label="t('ONBOARDING_INBOX_SETUP.SKIP')"
-    :is-loading="isSubmitting"
-    @continue="handleContinue"
-    @skip="handleSkip"
-  >
-    <template #greeting-icon>
-      <Icon icon="i-lucide-wrench" class="size-4 text-n-slate-7" />
-    </template>
-
-    <OnboardingSection
-      :title="t('ONBOARDING_INBOX_SETUP.CREATED_FOR_YOU.TITLE')"
-      icon="i-lucide-sparkles"
+  <div>
+    <OnboardingLayout
+      :greeting="t('ONBOARDING_INBOX_SETUP.GREETING')"
+      :subtitle="t('ONBOARDING_INBOX_SETUP.SUBTITLE')"
+      :continue-label="t('ONBOARDING_INBOX_SETUP.CONTINUE')"
+      :skip-label="t('ONBOARDING_INBOX_SETUP.SKIP')"
+      :is-loading="isSubmitting"
+      @continue="handleContinue"
+      @skip="handleSkip"
     >
-      <div class="divide-y divide-n-weak">
-        <WebWidgetCreationStatus />
-        <HelpCenterCreationStatus
-          v-if="isEnterprise && helpCenterGenerationId"
+      <template #greeting-icon>
+        <Icon icon="i-lucide-wrench" class="size-4 text-n-slate-7" />
+      </template>
+
+      <OnboardingSection
+        :title="t('ONBOARDING_INBOX_SETUP.CREATED_FOR_YOU.TITLE')"
+        icon="i-lucide-sparkles"
+      >
+        <div class="divide-y divide-n-weak">
+          <WebWidgetCreationStatus />
+          <HelpCenterCreationStatus
+            v-if="isEnterprise && helpCenterGenerationId"
+          />
+        </div>
+      </OnboardingSection>
+
+      <OnboardingSection
+        :title="t('ONBOARDING_INBOX_SETUP.CHANNELS.TITLE')"
+        icon="i-lucide-inbox"
+      >
+        <ChannelRow
+          v-for="channel in displayedChannels"
+          :key="channel.type"
+          :channel="channel"
+          :connected-inbox="connectedInbox(channel)"
+          @connect="connectChannel"
         />
-      </div>
-    </OnboardingSection>
-
-    <OnboardingSection
-      :title="t('ONBOARDING_INBOX_SETUP.CHANNELS.TITLE')"
-      icon="i-lucide-inbox"
-    >
-      <ChannelRow
-        v-for="channel in displayedChannels"
-        :key="channel.type"
-        :channel="channel"
-        :connected-inbox="connectedInbox(channel)"
-        @connect="connectChannel"
-      />
-      <InboxChannelsFooter
-        :remaining-channels="remainingChannels"
-        @view-all="openChannelsDialog"
-      />
-    </OnboardingSection>
-  </OnboardingLayout>
-  <InboxChannelsDialog
-    ref="channelsDialogRef"
-    :inboxes="inboxes"
-    @connected="refetchInboxes"
-  />
+        <InboxChannelsFooter
+          :remaining-channels="remainingChannels"
+          @view-all="openChannelsDialog"
+        />
+      </OnboardingSection>
+    </OnboardingLayout>
+    <InboxChannelsDialog
+      ref="channelsDialogRef"
+      :inboxes="inboxes"
+      @connected="refetchInboxes"
+    />
+  </div>
 </template>
