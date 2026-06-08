@@ -308,7 +308,7 @@
           "AUTH_PROCESSING": "Authenticating with Meta",
           "WAITING_FOR_BUSINESS_INFO": "Please complete business setup in the Meta window...",
           "PROCESSING": "Setting up your WhatsApp Business Account",
-          "ENABLING_CALLING": "Enabling WhatsApp Calling on your number…",
+          "ENABLING_CALLING": "Activando llamadas de WhatsApp en tu número…",
           "LOADING_SDK": "Loading Facebook SDK...",
           "CANCELLED": "WhatsApp Signup was cancelled",
           "SUCCESS_TITLE": "WhatsApp Business Account Connected!",
@@ -319,7 +319,7 @@
           "SUCCESS_FALLBACK": "WhatsApp Business Account has been successfully configured",
           "MANUAL_FALLBACK": "If your number is already connected to the WhatsApp Business Platform (API), or if you’re a tech provider onboarding your own number, please use the {link} flow",
           "MANUAL_LINK_TEXT": "manual setup flow",
-          "CALLING_ENABLE_FAILED": "Your WhatsApp inbox is ready, but voice calling couldn't be turned on — this number isn't enrolled in the WhatsApp Business Calling API yet. Reach out to Meta or your WhatsApp Business Solution Provider to onboard it, then turn calling on from the inbox's Calls settings."
+          "CALLING_ENABLE_FAILED": "Tu bandeja de entrada de WhatsApp está lista, pero las llamadas de voz no se pudieron activar — este número aún no está inscrito en la API de llamadas empresariales de WhatsApp. Llega a Meta o a tu proveedor de soluciones empresariales de WhatsApp a bordo, luego enciende la llamada desde la configuración de las llamadas de la bandeja de entrada."
         },
         "API": {
           "ERROR_MESSAGE": "No pudimos guardar el canal de WhatsApp"
@@ -468,8 +468,8 @@
             "DESCRIPTION": "Support your customers on WhatsApp"
           },
           "WHATSAPP_CALL": {
-            "TITLE": "WhatsApp Call",
-            "DESCRIPTION": "Take voice calls on your WhatsApp number"
+            "TITLE": "Llamada de WhatsApp",
+            "DESCRIPTION": "Responde llamadas de voz en tu número de WhatsApp"
           },
           "EMAIL": {
             "TITLE": "E-mail",
@@ -644,15 +644,15 @@
       "ACCOUNT_HEALTH": "Account Health",
       "CSAT": "Encuestas de Satisfacción",
       "VOICE": "Voice",
-      "CALLS": "Calls"
+      "CALLS": "Llamadas"
     },
     "VOICE_CONFIGURATION": {
       "ENABLE_VOICE": {
-        "LABEL": "Enable Voice Calling",
-        "DESCRIPTION": "Enable voice calling on this inbox. Agents will be able to make and receive phone calls."
+        "LABEL": "Habilitar llamadas de voz",
+        "DESCRIPTION": "Activar llamadas de voz en esta bandeja de entrada. Los agentes podrán hacer y recibir llamadas telefónicas."
       },
       "CREDENTIALS": {
-        "DESCRIPTION": "Voice calling requires Twilio API Key credentials. These are used to generate tokens for agent voice connections."
+        "DESCRIPTION": "Llamada de voz requiere credenciales de Clave de Twilio API. Estas se utilizan para generar tokens para las conexiones de voz del agente."
       }
     },
     "WHATSAPP_CALLING": {
