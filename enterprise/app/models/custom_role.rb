@@ -39,4 +39,11 @@ class CustomRole < ApplicationRecord
 
   validates :name, presence: true
   validates :permissions, inclusion: { in: PERMISSIONS }
+
+  # CustomRole details are embedded into the cached account_user payload via
+  # api/v1/models/_account_user.json.jbuilder, so bump that cache key on any
+  # change. `dependent: :nullify` updates account_users via update_all (which
+  # skips their callbacks), so the deletion is bumped here directly.
+  after_update_commit -> { account.update_cache_key('account_user') }
+  after_destroy_commit -> { account.update_cache_key('account_user') }
 end
