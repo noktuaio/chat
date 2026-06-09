@@ -64,7 +64,9 @@ class Enterprise::Billing::SwitchCurrencyService
       new_price_id: resolve_new_price_id(plan),
       original_price_id: subscription['plan']['id'],
       quantity: subscription['quantity'],
-      paid_through: subscription_period_end(subscription),
+      # Paid plans preserve paid-through (new sub trials until then); the free default plan switches
+      # immediately to an active sub, so a default-plan account can switch again any time.
+      paid_through: default_price?(subscription) ? nil : subscription_period_end(subscription),
       key: subscription.id
     }
   end
