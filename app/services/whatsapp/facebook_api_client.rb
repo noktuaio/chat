@@ -1,8 +1,6 @@
 class Whatsapp::FacebookApiClient
   BASE_URI = 'https://graph.facebook.com'.freeze
-  # Base fields: inbound `messages` + `smb_message_echoes` (SMB coexistence). Resent on every subscribe so Meta won't reset to defaults.
-  SUBSCRIBED_FIELDS = %w[messages smb_message_echoes].freeze
-  # Adds `calls` for voice webhooks; narrowed back to base when voice is disabled.
+  # Webhook fields resent on every subscribe so Meta won't reset to defaults. `calls` powers voice; the disable-voice path narrows it.
   WEBHOOK_DEFAULT_FIELDS = %w[messages smb_message_echoes calls].freeze
 
   def initialize(access_token = nil)
@@ -73,7 +71,7 @@ class Whatsapp::FacebookApiClient
     override_phone_number_callback(phone_number_id, callback_url, verify_token)
   end
 
-  def subscribe_app_to_waba(waba_id, subscribed_fields: SUBSCRIBED_FIELDS)
+  def subscribe_app_to_waba(waba_id, subscribed_fields: WEBHOOK_DEFAULT_FIELDS)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{waba_id}/subscribed_apps",
       headers: request_headers,
