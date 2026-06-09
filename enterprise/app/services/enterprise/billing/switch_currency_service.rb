@@ -6,30 +6,27 @@ class Enterprise::Billing::SwitchCurrencyService
   # Tags a cancelled sub so the deleted-webhook skips re-subscribing the default plan.
   SWITCH_METADATA_KEY = 'chatwoot_currency_switch'.freeze
 
-  # Paid statuses that block a switch: delinquent (past_due, unpaid) or awaiting initial payment (incomplete, can still activate).
-  BLOCKED_PAID_STATUSES = %w[past_due unpaid incomplete].freeze
+  # Stripe statuses that are done and can't reactivate — ignored when checking switch eligibility.
+  TERMINAL_STATUSES = %w[canceled incomplete_expired].freeze
 
   pattr_initialize [:account!, :currency!]
 
-  # Ordered most-reversible first so any failure aborts cleanly: validate -> customer sync (idempotent,
-  # before any cancellation) -> subscription replacement (self-reverting) -> local DB persist (last, alone).
+  # Only the simple happy path is allowed: exactly one active paid subscription, nothing else pending.
+  # Everything else is rejected up front (validated), so we never mutate Stripe for an edge case.
+  # Order: validate (no mutation) -> idempotent customer sync -> subscription replacement (self-reverting)
+  # -> local DB persist (last, alone), so any failure aborts cleanly without leaving split state.
   def perform
     validate!
-    reject_unsettled_paid_subscription!
+    subscription = eligible_paid_subscription!
+    plan = resolve_plan!(subscription)
+    change = change_for(subscription, plan)
 
-    subscriptions = live_subscriptions
-    paid_subscription = subscriptions.find { |subscription| !default_price?(subscription) }
-    validate_payment_method! if paid_subscription
-
-    # Sync the customer before touching subscriptions: a failure here leaves nothing cancelled and the DB
-    # untouched, so the controller's error matches state and a retry re-runs the whole switch.
+    validate_payment_method!
     sync_stripe_customer_location
 
-    attributes = paid_subscription ? switch_paid_plan(subscriptions, paid_subscription) : switch_free_plan(subscriptions)
-
-    # Persist last: the local DB write is the only step after Stripe succeeds, and it gates retries via same_currency.
-    persist_currency(attributes)
-    Enterprise::Billing::ReconcilePlanFeaturesService.new(account: account).perform if paid_subscription
+    new_subscription = replace_subscription(subscription, change)
+    persist_currency(build_custom_attributes(new_subscription, plan))
+    Enterprise::Billing::ReconcilePlanFeaturesService.new(account: account).perform
   end
 
   private
@@ -45,40 +42,30 @@ class Enterprise::Billing::SwitchCurrencyService
     raise Error, I18n.t('errors.billing.stripe_customer_not_configured') if stripe_customer_id.blank?
   end
 
-  # Free plan: recreate the default sub in the new currency so a later upgrade starts there. Returns the attributes to persist.
-  def switch_free_plan(subscriptions)
-    default_subscription = subscriptions.find { |subscription| default_price?(subscription) }
-    return account.custom_attributes.merge('billing_currency' => target_currency) unless default_subscription
+  # Exactly one live subscription, active, on a paid plan. Anything else (pending, extra, or free) is rejected.
+  def eligible_paid_subscription!
+    subscription = live_subscriptions.first
+    eligible = live_subscriptions.one? && subscription.status == 'active' && !default_price?(subscription)
+    raise Error, I18n.t('errors.billing.switch_requires_active_subscription') unless eligible
 
-    recreated_default_attributes(subscriptions, default_subscription)
+    subscription
   end
 
-  def recreated_default_attributes(subscriptions, default_subscription)
-    plan = Enterprise::Billing::PlanConfiguration.default_plan
-    change = {
-      new_price_id: resolve_new_price_id(plan),
-      original_price_id: default_subscription['plan']['id'],
-      quantity: default_subscription['quantity'],
-      key: default_subscription.id
-    }
-
-    build_custom_attributes(replace_subscriptions(subscriptions, change), plan)
-  end
-
-  # Replace all live subs with one paid sub in the target currency, preserving seats and paid-through. Returns the attributes to persist.
-  def switch_paid_plan(subscriptions, paid_subscription)
-    plan = current_plan(paid_subscription)
+  def resolve_plan!(subscription)
+    plan = current_plan(subscription)
     raise Error, I18n.t('errors.billing.unknown_plan') if plan.blank?
 
-    change = {
-      new_price_id: resolve_new_price_id(plan),
-      original_price_id: paid_subscription['plan']['id'],
-      quantity: paid_subscription['quantity'],
-      paid_through: subscriptions.filter_map { |subscription| subscription_period_end(subscription) }.max,
-      key: paid_subscription.id
-    }
+    plan
+  end
 
-    build_custom_attributes(replace_subscriptions(subscriptions, change), plan)
+  def change_for(subscription, plan)
+    {
+      new_price_id: resolve_new_price_id(plan),
+      original_price_id: subscription['plan']['id'],
+      quantity: subscription['quantity'],
+      paid_through: subscription_period_end(subscription),
+      key: subscription.id
+    }
   end
 
   def resolve_new_price_id(plan)
@@ -93,10 +80,10 @@ class Enterprise::Billing::SwitchCurrencyService
     plan || Enterprise::Billing::PlanConfiguration.find_plan_by_product_id(subscription['plan']['product'])
   end
 
-  # Cancel old subs, create the new-currency sub; revert to the original plan on failure.
+  # Cancel the old sub, create the new-currency sub; revert to the original plan on failure.
   # prorate:false (Stripe can't mix currencies); trial_end keeps the already-paid time.
-  def replace_subscriptions(subscriptions, change)
-    cancel_subscriptions(subscriptions)
+  def replace_subscription(subscription, change)
+    cancel_subscription(subscription)
 
     begin
       create_currency_subscription(change[:new_price_id], change, 'switch')
@@ -106,17 +93,13 @@ class Enterprise::Billing::SwitchCurrencyService
     end
   end
 
-  def cancel_subscriptions(subscriptions)
-    subscriptions.each do |subscription|
-      Stripe::Subscription.update(subscription.id, metadata: { SWITCH_METADATA_KEY => 'true' })
-      begin
-        Stripe::Subscription.cancel(subscription.id, { prorate: false })
-      rescue Stripe::StripeError
-        # Clear the flag so a still-live sub isn't permanently skipped by the webhook guard.
-        Stripe::Subscription.update(subscription.id, metadata: { SWITCH_METADATA_KEY => '' })
-        raise
-      end
-    end
+  def cancel_subscription(subscription)
+    Stripe::Subscription.update(subscription.id, metadata: { SWITCH_METADATA_KEY => 'true' })
+    Stripe::Subscription.cancel(subscription.id, { prorate: false })
+  rescue Stripe::StripeError
+    # Clear the flag so a still-live sub isn't permanently skipped by the webhook guard.
+    Stripe::Subscription.update(subscription.id, metadata: { SWITCH_METADATA_KEY => '' })
+    raise
   end
 
   def create_currency_subscription(price_id, change, key_prefix)
@@ -155,21 +138,12 @@ class Enterprise::Billing::SwitchCurrencyService
     )
   end
 
-  # Block the switch while a paid sub is unsettled, else the account currency/location changes but that sub stays/activates in the old currency.
-  def reject_unsettled_paid_subscription!
-    blocked = all_subscriptions.any? do |subscription|
-      BLOCKED_PAID_STATUSES.include?(subscription.status) && !default_price?(subscription)
-    end
-    raise Error, I18n.t('errors.billing.past_due_subscription') if blocked
-  end
-
   def all_subscriptions
     @all_subscriptions ||= Stripe::Subscription.list(customer: stripe_customer_id, status: 'all', limit: 100).data
   end
 
-  # Includes trialing (a prior switch leaves the new sub trialing); unsettled paid subs are caught by reject_unsettled_paid_subscription!.
   def live_subscriptions
-    all_subscriptions.select { |subscription| %w[active trialing].include?(subscription.status) }
+    @live_subscriptions ||= all_subscriptions.reject { |subscription| TERMINAL_STATUSES.include?(subscription.status) }
   end
 
   def validate_payment_method!
