@@ -61,12 +61,7 @@ class Whatsapp::WebhookSetupService
     verify_token = @channel.provider_config['webhook_verify_token']
     phone_number_id = @channel.provider_config['phone_number_id']
 
-    args = [@waba_id, phone_number_id, callback_url, verify_token]
-    if subscribed_fields
-      @api_client.subscribe_phone_number_webhook(*args, subscribed_fields: subscribed_fields)
-    else
-      @api_client.subscribe_phone_number_webhook(*args)
-    end
+    @api_client.subscribe_phone_number_webhook(@waba_id, phone_number_id, callback_url, verify_token, subscribed_fields: subscribed_fields)
     mark_phone_level_override_persisted
   rescue StandardError => e
     Rails.logger.error("[WHATSAPP] Webhook setup failed: #{e.message}")

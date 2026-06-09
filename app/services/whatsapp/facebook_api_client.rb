@@ -62,10 +62,10 @@ class Whatsapp::FacebookApiClient
     data['code_verification_status'] == 'VERIFIED'
   end
 
-  def subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token, subscribed_fields: WEBHOOK_DEFAULT_FIELDS)
+  def subscribe_phone_number_webhook(waba_id, phone_number_id, callback_url, verify_token, subscribed_fields: nil)
     # Subscribe app to WABA first — Meta requires it before any callback override (issue #13097).
     # subscribed_fields (incl. `calls` for voice) is declared here; the phone-level POST has no such field.
-    subscribe_app_to_waba(waba_id, subscribed_fields: subscribed_fields)
+    subscribe_app_to_waba(waba_id, subscribed_fields: subscribed_fields || WEBHOOK_DEFAULT_FIELDS)
 
     # Phone-level override takes precedence over WABA-level, so numbers on one WABA can route to different URLs.
     override_phone_number_callback(phone_number_id, callback_url, verify_token)
@@ -110,15 +110,9 @@ class Whatsapp::FacebookApiClient
     handle_response(response, 'Phone number webhook callback clear failed')
   end
 
-  # Removing a WABA-level alternate callback is a normal subscribe (no override params); the empty-string shape is phone-level and Meta ignores it.
+  # Removing a WABA-level alternate callback is just a normal subscribe — it drops the override while keeping the app subscribed for siblings.
   def clear_waba_callback_override(waba_id)
-    response = HTTParty.post(
-      "#{BASE_URI}/#{@api_version}/#{waba_id}/subscribed_apps",
-      headers: request_headers,
-      body: { subscribed_fields: WEBHOOK_DEFAULT_FIELDS }.to_json
-    )
-
-    handle_response(response, 'WABA webhook callback clear failed')
+    subscribe_app_to_waba(waba_id)
   end
 
   private
