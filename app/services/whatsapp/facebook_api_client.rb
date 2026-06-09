@@ -110,11 +110,12 @@ class Whatsapp::FacebookApiClient
     handle_response(response, 'Phone number webhook callback clear failed')
   end
 
+  # Removing a WABA-level alternate callback is a normal subscribe (no override params); the empty-string shape is phone-level and Meta ignores it.
   def clear_waba_callback_override(waba_id)
     response = HTTParty.post(
       "#{BASE_URI}/#{@api_version}/#{waba_id}/subscribed_apps",
       headers: request_headers,
-      body: { override_callback_uri: '' }.to_json
+      body: { subscribed_fields: WEBHOOK_DEFAULT_FIELDS }.to_json
     )
 
     handle_response(response, 'WABA webhook callback clear failed')
