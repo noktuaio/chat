@@ -104,8 +104,10 @@ class Enterprise::Billing::TopupCheckoutService
   end
 
   def topup_options
-    currency = account.billing_currency
-    rows = configured_options[currency].presence || configured_options[Enterprise::Billing::Currencies::DEFAULT].presence || []
+    # Label rows with the currency they were configured under, so a DEFAULT fallback can't relabel USD amounts and undercharge.
+    options = configured_options
+    currency = options[account.billing_currency].present? ? account.billing_currency : Enterprise::Billing::Currencies::DEFAULT
+    rows = options[currency].presence || []
     rows.map { |opt| { credits: opt['credits'].to_i, amount: opt['amount'].to_f, currency: currency } }
   end
 
