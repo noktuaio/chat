@@ -115,6 +115,16 @@ class Whatsapp::FacebookApiClient
     subscribe_app_to_waba(waba_id)
   end
 
+  # Fully removes this app's WABA subscription (last inbox deleted) so Meta stops delivering webhooks.
+  def unsubscribe_app_from_waba(waba_id)
+    response = HTTParty.delete(
+      "#{BASE_URI}/#{@api_version}/#{waba_id}/subscribed_apps",
+      headers: request_headers
+    )
+
+    handle_response(response, 'WABA app unsubscription failed')
+  end
+
   private
 
   def request_headers

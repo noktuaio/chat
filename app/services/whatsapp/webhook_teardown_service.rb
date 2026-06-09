@@ -9,7 +9,7 @@ class Whatsapp::WebhookTeardownService
     api_client = Whatsapp::FacebookApiClient.new(provider_config['api_key'])
 
     clear_phone_number_override(api_client)
-    clear_legacy_waba_override(api_client)
+    teardown_waba_app(api_client)
   rescue StandardError => e
     # before_destroy must never block a channel delete — log and move on.
     Rails.logger.error "[WHATSAPP] Webhook teardown failed for channel #{@channel&.id}: #{e.message}"
@@ -38,17 +38,22 @@ class Whatsapp::WebhookTeardownService
     Rails.logger.error "[WHATSAPP] Phone-level webhook clear failed for channel #{@channel.id}: #{e.message}"
   end
 
-  # Clear the shared WABA-level override only when no sibling still relies on it:
-  # phone-level siblings (webhook_override_level=phone_number) don't block; legacy rows do.
-  def clear_legacy_waba_override(api_client)
+  # Reconcile the shared WABA app subscription once the phone override is gone:
+  # legacy sibling → leave it; only phone-level siblings → drop the legacy override, keep subscribed; no siblings → unsubscribe the app.
+  def teardown_waba_app(api_client)
     waba_id = provider_config['business_account_id']
     return if waba_id.blank?
     return if waba_dependent_sibling_exists?(waba_id)
 
-    api_client.clear_waba_callback_override(waba_id)
-    Rails.logger.info "[WHATSAPP] Legacy WABA webhook override cleared for channel #{@channel.id}"
+    if waba_sibling_exists?(waba_id)
+      api_client.clear_waba_callback_override(waba_id)
+      Rails.logger.info "[WHATSAPP] Legacy WABA webhook override cleared for channel #{@channel.id}"
+    else
+      api_client.unsubscribe_app_from_waba(waba_id)
+      Rails.logger.info "[WHATSAPP] WABA app subscription removed for channel #{@channel.id}"
+    end
   rescue StandardError => e
-    Rails.logger.error "[WHATSAPP] Legacy WABA webhook clear failed for channel #{@channel.id}: #{e.message}"
+    Rails.logger.error "[WHATSAPP] WABA app teardown failed for channel #{@channel.id}: #{e.message}"
   end
 
   def waba_dependent_sibling_exists?(waba_id)
@@ -59,5 +64,11 @@ class Whatsapp::WebhookTeardownService
                  "COALESCE(provider_config ->> 'webhook_override_level', '') <> 'phone_number'",
                  waba_id
                ])
+  end
+
+  def waba_sibling_exists?(waba_id)
+    Channel::Whatsapp
+      .where.not(id: @channel.id)
+      .exists?(["provider_config ->> 'business_account_id' = ?", waba_id])
   end
 end
