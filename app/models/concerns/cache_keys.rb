@@ -4,7 +4,11 @@ module CacheKeys
   include CacheKeysHelper
   include Events::Types
 
-  CACHE_KEYS_EXPIRY = 72.hours
+  # Self-healing bound: if a write path ever changes cached data without
+  # bumping its key, expiry forces the sentinel and every client refetches.
+  # 7 days caps that staleness while sparing quiet models (labels, teams)
+  # from a spurious full refetch after every idle weekend.
+  CACHE_KEYS_EXPIRY = 7.days
 
   included do
     class_attribute :cacheable_models
