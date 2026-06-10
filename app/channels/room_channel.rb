@@ -7,6 +7,7 @@ class RoomChannel < ApplicationCable::Channel
     ensure_stream
     update_subscription
     broadcast_presence
+    transmit_cache_keys
   end
 
   def update_presence
@@ -22,6 +23,19 @@ class RoomChannel < ApplicationCable::Channel
     data = { account_id: @current_account.id, users: ::OnlineStatusTracker.get_available_users(@current_account.id) }
     data[:contacts] = ::OnlineStatusTracker.get_available_contacts(@current_account.id) if @current_user.is_a? User
     ActionCable.server.broadcast(pubsub_token, { event: 'presence.update', data: data })
+  end
+
+  # Push the authoritative cache-key map to this subscriber on every
+  # (re)subscribe. Boot and reconnect cache freshness ride the same
+  # account.cache_invalidated event the dashboard already handles for live
+  # invalidations — the client never pulls /cache_keys itself.
+  def transmit_cache_keys
+    return if @current_account.blank? || !@current_user.is_a?(User)
+
+    transmit({
+               event: Events::Types::ACCOUNT_CACHE_INVALIDATED,
+               data: { account_id: @current_account.id, cache_keys: @current_account.cache_keys }
+             })
   end
 
   def ensure_stream
