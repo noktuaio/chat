@@ -1,6 +1,5 @@
 import {
   SET_TEAM_UI_FLAG,
-  CLEAR_TEAMS,
   SET_TEAMS,
   SET_TEAM_ITEM,
   EDIT_TEAM,
@@ -22,22 +21,10 @@ export const actions = {
       commit(SET_TEAM_UI_FLAG, { isCreating: false });
     }
   },
-  revalidate: async ({ commit }, { newKey }) => {
-    try {
-      const isExistingKeyValid = await TeamsAPI.validateCacheKey(newKey);
-      if (!isExistingKeyValid) {
-        const response = await TeamsAPI.refetchAndCommit(newKey);
-        commit(SET_TEAMS, response.data);
-      }
-    } catch (error) {
-      // Ignore error
-    }
-  },
   get: async ({ commit }) => {
     commit(SET_TEAM_UI_FLAG, { isFetching: true });
     try {
       const { data } = await TeamsAPI.get(true);
-      commit(CLEAR_TEAMS);
       commit(SET_TEAMS, data);
     } catch (error) {
       throw new Error(error);

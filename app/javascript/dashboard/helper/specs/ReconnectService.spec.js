@@ -253,27 +253,6 @@ describe('ReconnectService', () => {
     });
   });
 
-  describe('revalidateCaches', () => {
-    it('should dispatch revalidate actions for labels, inboxes, and teams', async () => {
-      storeMock.dispatch.mockResolvedValueOnce({
-        label: 'labelKey',
-        inbox: 'inboxKey',
-        team: 'teamKey',
-      });
-      await reconnectService.revalidateCaches();
-      expect(storeMock.dispatch).toHaveBeenCalledWith('accounts/getCacheKeys');
-      expect(storeMock.dispatch).toHaveBeenCalledWith('labels/revalidate', {
-        newKey: 'labelKey',
-      });
-      expect(storeMock.dispatch).toHaveBeenCalledWith('inboxes/revalidate', {
-        newKey: 'inboxKey',
-      });
-      expect(storeMock.dispatch).toHaveBeenCalledWith('teams/revalidate', {
-        newKey: 'teamKey',
-      });
-    });
-  });
-
   describe('handleRouteSpecificFetch', () => {
     it('should fetch conversations and messages if current route is a conversation route', async () => {
       isAConversationRoute.mockReturnValue(true);
@@ -335,12 +314,10 @@ describe('ReconnectService', () => {
   });
 
   describe('onReconnect', () => {
-    it('should handle route-specific fetch, revalidate caches, and emit WEBSOCKET_RECONNECT_COMPLETED event', async () => {
+    it('should handle route-specific fetch and emit WEBSOCKET_RECONNECT_COMPLETED event', async () => {
       reconnectService.handleRouteSpecificFetch = vi.fn();
-      reconnectService.revalidateCaches = vi.fn();
       await reconnectService.onReconnect();
       expect(reconnectService.handleRouteSpecificFetch).toHaveBeenCalled();
-      expect(reconnectService.revalidateCaches).toHaveBeenCalled();
       expect(emitter.emit).toHaveBeenCalledWith(
         BUS_EVENTS.WEBSOCKET_RECONNECT_COMPLETED
       );

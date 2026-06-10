@@ -163,10 +163,6 @@ export const actions = {
       commit(types.default.SET_ACCOUNT_UI_FLAG, { isFetchingLimits: false });
     }
   },
-
-  getCacheKeys: async () => {
-    return AccountAPI.getCacheKeys();
-  },
 };
 
 export const mutations = {

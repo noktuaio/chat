@@ -32,18 +32,6 @@ export const getters = {
 };
 
 export const actions = {
-  revalidate: async function revalidate({ commit }, { newKey }) {
-    try {
-      const isExistingKeyValid = await LabelsAPI.validateCacheKey(newKey);
-      if (!isExistingKeyValid) {
-        const response = await LabelsAPI.refetchAndCommit(newKey);
-        commit(types.SET_LABELS, response.data.payload);
-      }
-    } catch (error) {
-      // Ignore error
-    }
-  },
-
   get: async function getLabels({ commit }) {
     commit(types.SET_LABEL_UI_FLAG, { isFetching: true });
     try {

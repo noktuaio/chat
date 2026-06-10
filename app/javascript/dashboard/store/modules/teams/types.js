@@ -1,5 +1,4 @@
 export const SET_TEAM_UI_FLAG = 'SET_TEAM_UI_FLAG';
-export const CLEAR_TEAMS = 'CLEAR_TEAMS';
 export const SET_TEAMS = 'SET_TEAMS';
 export const SET_TEAM_ITEM = 'SET_TEAM_ITEM';
 export const EDIT_TEAM = 'EDIT_TEAM';

@@ -216,14 +216,15 @@ RSpec.describe 'Accounts API', type: :request do
       expect(response.parsed_body['cache_keys'].keys).to match_array(%w[label inbox team])
     end
 
-    it 'sets the appropriate cache headers' do
+    it 'does not allow cached cache key responses' do
       get "/api/v1/accounts/#{account.id}/cache_keys",
           headers: admin.create_new_auth_token,
           as: :json
 
-      expect(response.headers['Cache-Control']).to include('max-age=10')
+      expect(response.headers['Cache-Control']).to include('max-age=0')
       expect(response.headers['Cache-Control']).to include('private')
-      expect(response.headers['Cache-Control']).to include('stale-while-revalidate=300')
+      expect(response.headers['Cache-Control']).to include('must-revalidate')
+      expect(response.headers['Cache-Control']).not_to include('stale-while-revalidate')
     end
   end
 

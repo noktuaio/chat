@@ -1,5 +1,4 @@
 import {
-  CLEAR_TEAMS,
   SET_TEAMS,
   SET_TEAM_ITEM,
   EDIT_TEAM,
@@ -11,9 +10,14 @@ describe('#mutations', () => {
   describe('#SET_teams', () => {
     it('set teams records', () => {
       const state = { records: {} };
-      mutations[SET_TEAMS](state, [teams[1]]);
-      mutations[SET_TEAMS](state, [teams[2]]);
+      mutations[SET_TEAMS](state, [teams[1], teams[2]]);
       expect(state.records).toEqual(teams);
+    });
+
+    it('drops records absent from the new list', () => {
+      const state = { records: { ...teams } };
+      mutations[SET_TEAMS](state, [teams[1]]);
+      expect(state.records).toEqual({ 1: teams[1] });
     });
   });
 
@@ -40,14 +44,6 @@ describe('#mutations', () => {
     it('delete teams record', () => {
       const state = { records: { 1: teams[1] } };
       mutations[DELETE_TEAM](state, 1);
-      expect(state.records).toEqual({});
-    });
-  });
-
-  describe('#CLEAR_TEAMS', () => {
-    it('delete teams record', () => {
-      const state = { records: { 1: teams[1] } };
-      mutations[CLEAR_TEAMS](state);
       expect(state.records).toEqual({});
     });
   });

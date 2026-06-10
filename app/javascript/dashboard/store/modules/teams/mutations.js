@@ -1,6 +1,5 @@
 import {
   SET_TEAM_UI_FLAG,
-  CLEAR_TEAMS,
   SET_TEAMS,
   SET_TEAM_ITEM,
   EDIT_TEAM,
@@ -15,19 +14,14 @@ export const mutations = {
     };
   },
 
-  [CLEAR_TEAMS]: $state => {
-    $state.records = {};
-  },
-
+  // Replaces (not merges) so rows deleted server-side never survive as
+  // phantoms — SET_TEAMS only ever receives the full list.
   [SET_TEAMS]: ($state, data) => {
-    const updatedRecords = { ...$state.records };
+    const records = {};
     data.forEach(team => {
-      updatedRecords[team.id] = {
-        ...(updatedRecords[team.id] || {}),
-        ...team,
-      };
+      records[team.id] = team;
     });
-    $state.records = updatedRecords;
+    $state.records = records;
   },
 
   [SET_TEAM_ITEM]: ($state, data) => {

@@ -98,17 +98,6 @@ class ReconnectService {
     await this.store.dispatch('notifications/index', { ...filter, page: 1 });
   };
 
-  revalidateCaches = async () => {
-    const { label, inbox, team } = await this.store.dispatch(
-      'accounts/getCacheKeys'
-    );
-    await Promise.all([
-      this.store.dispatch('labels/revalidate', { newKey: label }),
-      this.store.dispatch('inboxes/revalidate', { newKey: inbox }),
-      this.store.dispatch('teams/revalidate', { newKey: team }),
-    ]);
-  };
-
   handleRouteSpecificFetch = async () => {
     const currentRoute = this.router.currentRoute.value.name;
     if (isAConversationRoute(currentRoute, true)) {
@@ -138,9 +127,11 @@ class ReconnectService {
     this.setConversationLastMessageId();
   };
 
+  // Cached workspace config needs no explicit revalidation here: ActionCable
+  // auto-resubscribes after a drop, and RoomChannel pushes the cache-key map
+  // on every subscribe via the account.cache_invalidated event.
   onReconnect = async () => {
     await this.handleRouteSpecificFetch();
-    await this.revalidateCaches();
     emitter.emit(BUS_EVENTS.WEBSOCKET_RECONNECT_COMPLETED);
   };
 }
