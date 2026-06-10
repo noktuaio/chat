@@ -5,12 +5,13 @@ import ApiClient from './ApiClient';
 class CacheEnabledApiClient extends ApiClient {
   constructor(resource, options = {}) {
     super(resource, options);
+    // `cacheModel` is the Rails Model.name.underscore value — simultaneously
+    // the server cache-key name and the IDB object-store name.
+    this.cacheModelName = options.cacheModel;
+    // inbox/label endpoints wrap collections in { payload }; the rest return
+    // the bare array.
+    this.payloadEnvelope = options.payloadEnvelope || false;
     this.dataManager = new DataManager(this.accountIdFromRoute);
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  get cacheModelName() {
-    throw new Error('cacheModelName is not defined');
   }
 
   get(cache = false) {
@@ -25,14 +26,14 @@ class CacheEnabledApiClient extends ApiClient {
     return axios.get(this.url);
   }
 
-  // eslint-disable-next-line class-methods-use-this
   extractDataFromResponse(response) {
-    return response.data.payload;
+    return this.payloadEnvelope ? response.data.payload : response.data;
   }
 
-  // eslint-disable-next-line class-methods-use-this
   marshallData(dataToParse) {
-    return { data: { payload: dataToParse } };
+    return this.payloadEnvelope
+      ? { data: { payload: dataToParse } }
+      : { data: dataToParse };
   }
 
   async getFromCache() {

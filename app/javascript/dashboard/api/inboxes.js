@@ -3,12 +3,11 @@ import CacheEnabledApiClient from './CacheEnabledApiClient';
 
 class Inboxes extends CacheEnabledApiClient {
   constructor() {
-    super('inboxes', { accountScoped: true });
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  get cacheModelName() {
-    return 'inbox';
+    super('inboxes', {
+      accountScoped: true,
+      cacheModel: 'inbox',
+      payloadEnvelope: true,
+    });
   }
 
   getCampaigns(inboxId) {
