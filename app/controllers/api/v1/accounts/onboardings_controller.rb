@@ -31,6 +31,11 @@ class Api::V1::Accounts::OnboardingsController < Api::V1::Accounts::BaseControll
   end
 
   def complete_account_details
+    # The stored cursor may still be 'enrichment' when the client submits after
+    # the enrichment timeout, so accept either pre-inbox_setup state. A stale
+    # replay after onboarding finished (no stored step) must not re-enter it.
+    return unless %w[enrichment account_details].include?(@account.custom_attributes['onboarding_step'])
+
     @account.assign_attributes(account_params)
     @account.custom_attributes.merge!(custom_attributes_params)
     @account.custom_attributes['onboarding_step'] = 'inbox_setup'

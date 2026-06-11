@@ -87,6 +87,32 @@ RSpec.describe 'Onboarding API', type: :request do
       end
     end
 
+    context 'when completing account_details while enrichment is still pending' do
+      before { account.update!(custom_attributes: { 'onboarding_step' => 'enrichment' }) }
+
+      it 'still advances to inbox_setup (post-timeout submit)' do
+        patch "/api/v1/accounts/#{account.id}/onboarding",
+              params: { website: 'acme.com', onboarding_step: 'account_details' },
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(account.reload.custom_attributes['onboarding_step']).to eq('inbox_setup')
+      end
+    end
+
+    context 'when replaying account_details after onboarding has finished' do
+      before { account.update!(custom_attributes: { 'website' => 'acme.com' }) }
+
+      it 'does not re-enter onboarding or persist the stale payload' do
+        patch "/api/v1/accounts/#{account.id}/onboarding",
+              params: { website: 'stale.com', onboarding_step: 'account_details' },
+              headers: admin.create_new_auth_token, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(account.reload.custom_attributes).not_to have_key('onboarding_step')
+        expect(account.custom_attributes['website']).to eq('acme.com')
+      end
+    end
+
     context 'when finalizing inbox_setup' do
       before { account.update!(custom_attributes: { 'onboarding_step' => 'inbox_setup' }) }
 
