@@ -10,7 +10,7 @@ class Enterprise::Billing::StripeCurrencySwitchExecutor
 
   # Returns the newly-created Stripe subscription.
   def execute(subscription:, change:)
-    validate_payment_method! unless Enterprise::Billing::PlanConfiguration.default_price?(subscription['plan']['id'])
+    validate_payment_method! unless change[:default_plan]
 
     previous_currency = account.billing_currency
     sync_customer_location(target_currency)
@@ -55,7 +55,13 @@ class Enterprise::Billing::StripeCurrencySwitchExecutor
     params = { customer: stripe_customer_id, items: [{ price: price_id, quantity: change[:quantity] }] }
     # trial_end preserves the already-paid time so switching mid-cycle doesn't double-charge.
     params[:trial_end] = change[:paid_through] if change[:paid_through].present? && change[:paid_through] > Time.current.to_i
-    Stripe::Subscription.create(params, { idempotency_key: "switch-#{account.id}-#{change[:key]}" })
+    Stripe::Subscription.create(params, { idempotency_key: idempotency_key })
+  end
+
+  # Fresh per switch attempt: a retry after a rolled-back (cancelled) create must create a new
+  # subscription, not replay Stripe's stored response for the now-cancelled one.
+  def idempotency_key
+    @idempotency_key ||= "switch-#{account.id}-#{SecureRandom.uuid}"
   end
 
   def validate_payment_method!
@@ -68,16 +74,17 @@ class Enterprise::Billing::StripeCurrencySwitchExecutor
     Stripe::Customer.update(stripe_customer_id, invoice_settings: { default_payment_method: payment_methods.data.first.id })
   end
 
-  # Only currencies that need a country override (e.g. BRL/PIX) push an address/locale to Stripe;
-  # usd keeps Stripe's defaults, matching how the customer is first created.
+  # Currencies that need a country override (e.g. BRL/PIX) push it to Stripe; for currencies without
+  # one (usd) we clear any prior override so the customer matches how a usd customer is first created
+  # — otherwise switching away from BRL would leave a stale BR/pt-BR address on the customer.
   def sync_customer_location(currency_code)
     country = Enterprise::Billing::Currencies.country_for(currency_code)
-    return if country.blank?
+    locale = Enterprise::Billing::Currencies.preferred_locale_for(currency_code)
 
     Stripe::Customer.update(
       stripe_customer_id,
-      address: { country: country },
-      preferred_locales: [Enterprise::Billing::Currencies.preferred_locale_for(currency_code)]
+      address: { country: country.presence || '' },
+      preferred_locales: locale.present? ? [locale] : []
     )
   end
 

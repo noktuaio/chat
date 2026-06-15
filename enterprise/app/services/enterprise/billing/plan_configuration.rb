@@ -36,8 +36,8 @@ module Enterprise::Billing::PlanConfiguration
     price_ids_by_currency(plan).values.flatten.compact.include?(price_id)
   end
 
-  def default_price?(price_id)
-    plan_contains_price_id?(default_plan, price_id)
+  def default_plan?(plan)
+    plan.present? && plan['name'] == default_plan&.dig('name')
   end
 
   # [plan, currency] for a price id, else [nil, nil].

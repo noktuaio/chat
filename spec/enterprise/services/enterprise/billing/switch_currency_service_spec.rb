@@ -57,6 +57,14 @@ describe Enterprise::Billing::SwitchCurrencyService do
       expect(Stripe::Subscription).to have_received(:cancel).with('sub_usd', { prorate: false }).ordered
     end
 
+    it 'uses a per-attempt idempotency key not derived from the subscription id' do
+      service.perform
+
+      expect(Stripe::Subscription).to have_received(:create).with(
+        anything, hash_including(idempotency_key: a_string_matching(/\Aswitch-#{account.id}-[0-9a-f-]{36}\z/))
+      )
+    end
+
     it 'persists the new currency and clears the pending marker' do
       service.perform
 
@@ -144,6 +152,68 @@ describe Enterprise::Billing::SwitchCurrencyService do
         attributes = account.reload.custom_attributes
         expect(attributes['billing_currency']).to eq('usd')
         expect(attributes).not_to have_key('billing_currency_switch_pending')
+      end
+    end
+
+    context 'when a free default-plan subscription has a stale price id' do
+      # Price id no longer in CHATWOOT_CLOUD_PLANS, but product_id still maps to the default (Hacker) plan.
+      let(:active_subscription) do
+        Stripe::Subscription.construct_from(
+          id: 'sub_hacker', status: 'active', quantity: 1, current_period_end: period_end,
+          plan: { id: 'price_hacker_legacy_usd', product: 'prod_hacker' }, metadata: {}
+        )
+      end
+      let(:new_subscription) do
+        Stripe::Subscription.construct_from(
+          id: 'sub_hacker_brl', status: 'active', quantity: 1, current_period_end: period_end,
+          plan: { id: 'price_hacker_brl', product: 'prod_hacker' }, metadata: {}
+        )
+      end
+
+      before do
+        account.update!(custom_attributes: { plan_name: 'Hacker', stripe_customer_id: stripe_customer_id, billing_currency: 'usd' })
+        # No payment method available — a default-plan switch must not require one.
+        allow(Stripe::Customer).to receive(:retrieve).and_return(
+          Struct.new(:invoice_settings, :default_source).new(Struct.new(:default_payment_method).new(nil), nil)
+        )
+        allow(Stripe::PaymentMethod).to receive(:list).and_return(Struct.new(:data).new([]))
+      end
+
+      it 'switches without requiring a payment method or a paid-through trial' do
+        service.perform
+
+        expect(Stripe::Customer).not_to have_received(:retrieve)
+        expect(Stripe::Subscription).to have_received(:create).with(hash_not_including(:trial_end), anything)
+        expect(account.reload.custom_attributes['billing_currency']).to eq('brl')
+      end
+    end
+
+    context 'when switching from brl to usd' do
+      let(:target_currency) { 'usd' }
+      let(:active_subscription) do
+        Stripe::Subscription.construct_from(
+          id: 'sub_brl', status: 'active', quantity: 2, current_period_end: period_end,
+          plan: { id: 'price_business_brl', product: 'prod_business' }, metadata: {}
+        )
+      end
+      let(:new_subscription) do
+        Stripe::Subscription.construct_from(
+          id: 'sub_usd', status: 'trialing', quantity: 2, current_period_end: period_end,
+          plan: { id: 'price_business_usd', product: 'prod_business' }, metadata: {}
+        )
+      end
+
+      before do
+        account.update!(custom_attributes: { plan_name: 'Business', stripe_customer_id: stripe_customer_id, billing_currency: 'brl' })
+      end
+
+      it 'clears the stripe billing country and locale override' do
+        service.perform
+
+        expect(Stripe::Customer).to have_received(:update).with(
+          stripe_customer_id, hash_including(address: { country: '' }, preferred_locales: [])
+        )
+        expect(account.reload.custom_attributes['billing_currency']).to eq('usd')
       end
     end
   end

@@ -21,12 +21,13 @@ class Enterprise::Billing::SwitchCurrencyService
   def perform
     subscription = eligibility.subscription!
     resolver = Enterprise::Billing::PlanPriceResolver.new(subscription: subscription, target_currency: target_currency)
-    change = change_for(subscription, resolver.target_price_id)
+    plan = resolver.plan
+    change = change_for(subscription, resolver.target_price_id, default_plan: Enterprise::Billing::PlanConfiguration.default_plan?(plan))
 
     mark_pending
     new_subscription = executor.execute(subscription: subscription, change: change)
 
-    persist_currency(build_custom_attributes(new_subscription, resolver.plan))
+    persist_currency(build_custom_attributes(new_subscription, plan))
     Enterprise::Billing::ReconcilePlanFeaturesService.new(account: account).perform
   rescue Enterprise::Billing::CurrencySwitchEligibility::Error,
          Enterprise::Billing::PlanPriceResolver::Error,
@@ -50,14 +51,14 @@ class Enterprise::Billing::SwitchCurrencyService
     @target_currency ||= Enterprise::Billing::Currencies.normalize(currency)
   end
 
-  def change_for(subscription, new_price_id)
+  def change_for(subscription, new_price_id, default_plan:)
     {
       new_price_id: new_price_id,
       quantity: subscription['quantity'],
       # Paid plans preserve paid-through (new sub trials until then); the free default plan switches
       # immediately to an active sub, so a default-plan account can switch again any time.
-      paid_through: Enterprise::Billing::PlanConfiguration.default_price?(subscription['plan']['id']) ? nil : subscription_period_end(subscription),
-      key: subscription.id
+      paid_through: default_plan ? nil : subscription_period_end(subscription),
+      default_plan: default_plan
     }
   end
 
