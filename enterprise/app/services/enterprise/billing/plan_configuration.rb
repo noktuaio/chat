@@ -36,6 +36,10 @@ module Enterprise::Billing::PlanConfiguration
     price_ids_by_currency(plan).values.flatten.compact.include?(price_id)
   end
 
+  def default_price?(price_id)
+    plan_contains_price_id?(default_plan, price_id)
+  end
+
   # [plan, currency] for a price id, else [nil, nil].
   def find_plan_by_price_id(price_id)
     plans.each do |plan|

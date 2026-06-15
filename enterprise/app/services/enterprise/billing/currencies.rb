@@ -38,11 +38,6 @@ module Enterprise::Billing::Currencies
     LOCALE_DEFAULTS.fetch(locale.to_s, DEFAULT)
   end
 
-  # Currency switching is rolled out only to locales with a non-default currency (e.g. pt_BR).
-  def rollout_enabled?(locale)
-    LOCALE_DEFAULTS.key?(locale.to_s)
-  end
-
   def country_for(code)
     COUNTRY_BY_CURRENCY[to_supported(code)]
   end

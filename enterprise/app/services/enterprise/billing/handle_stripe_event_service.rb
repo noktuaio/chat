@@ -67,7 +67,8 @@ class Enterprise::Billing::HandleStripeEventService
         'subscription_status' => subscription['status'],
         'subscription_ends_on' => subscription_ends_on(subscription),
         'billing_currency' => billing_currency_for(subscription, plan)
-      )
+        # Reconciling from Stripe is the final word on a currency switch — drop any in-flight marker.
+      ).except(Enterprise::Billing::SwitchCurrencyService::PENDING_CURRENCY_KEY)
     )
   end
 

@@ -1,3 +1,9 @@
+# Orchestrates a billing currency switch:
+#   eligibility (no mutation) -> resolve target price -> mark pending -> Stripe swap (self-reverting)
+#   -> persist local state (last). Each concern lives in its own collaborator so this stays a thin
+# coordinator. Any failure aborts before persisting, so Chatwoot is never left ahead of Stripe; the
+# rare window where Stripe succeeds but the local persist fails is reconciled by the subscription
+# webhook, which also clears the pending marker.
 class Enterprise::Billing::SwitchCurrencyService
   include BillingHelper
 
@@ -6,119 +12,53 @@ class Enterprise::Billing::SwitchCurrencyService
   # Tags a cancelled sub so the deleted-webhook skips re-subscribing the default plan.
   SWITCH_METADATA_KEY = 'chatwoot_currency_switch'.freeze
 
-  # Stripe statuses that are done and can't reactivate — ignored when checking switch eligibility.
-  TERMINAL_STATUSES = %w[canceled incomplete_expired].freeze
-
-  # Healthy statuses that may switch currency; trialing covers a sub left trialing by a prior paid switch.
-  SWITCHABLE_STATUSES = %w[active trialing].freeze
+  # Records the in-flight target currency so a crash mid-switch is visible; cleared on success or by
+  # the subscription webhook once it reconciles the final state from Stripe.
+  PENDING_CURRENCY_KEY = 'billing_currency_switch_pending'.freeze
 
   pattr_initialize [:account!, :currency!]
 
-  # Only the simple happy path is allowed: exactly one active subscription (paid or default plan),
-  # nothing else pending. Everything else is rejected up front so we never mutate Stripe for an edge case.
-  # Order: validate (no mutation) -> idempotent customer sync -> subscription replacement (self-reverting)
-  # -> local DB persist (last, alone), so any failure aborts cleanly without leaving split state.
   def perform
-    validate!
-    subscription = eligible_active_subscription!
-    plan = resolve_plan!(subscription)
-    change = change_for(subscription, plan)
+    subscription = eligibility.subscription!
+    resolver = Enterprise::Billing::PlanPriceResolver.new(subscription: subscription, target_currency: target_currency)
+    change = change_for(subscription, resolver.target_price_id)
 
-    # Default plan is free, so it needs no payment method; paid plans must have one to bill the new sub.
-    validate_payment_method! unless default_price?(subscription)
-    sync_stripe_customer_location
+    mark_pending
+    new_subscription = executor.execute(subscription: subscription, change: change)
 
-    begin
-      new_subscription = replace_subscription(subscription, change)
-    rescue StandardError
-      # Replacement failed and reverted to the old currency — undo the customer location change too.
-      restore_customer_location
-      raise
-    end
-
-    persist_currency(build_custom_attributes(new_subscription, plan))
+    persist_currency(build_custom_attributes(new_subscription, resolver.plan))
     Enterprise::Billing::ReconcilePlanFeaturesService.new(account: account).perform
+  rescue Enterprise::Billing::CurrencySwitchEligibility::Error,
+         Enterprise::Billing::PlanPriceResolver::Error,
+         Enterprise::Billing::StripeCurrencySwitchExecutor::Error => e
+    # The Stripe swap self-reverted, so drop the pending marker and surface a single error type.
+    clear_pending
+    raise Error, e.message
   end
 
   private
+
+  def eligibility
+    @eligibility ||= Enterprise::Billing::CurrencySwitchEligibility.new(account: account, currency: currency)
+  end
+
+  def executor
+    @executor ||= Enterprise::Billing::StripeCurrencySwitchExecutor.new(account: account, target_currency: target_currency)
+  end
 
   def target_currency
     @target_currency ||= Enterprise::Billing::Currencies.normalize(currency)
   end
 
-  def validate!
-    raise Error, I18n.t('errors.billing.currency_switch_unavailable') unless Enterprise::Billing::Currencies.rollout_enabled?(account.locale)
-    raise Error, I18n.t('errors.billing.unsupported_currency') unless Enterprise::Billing::Currencies.supported?(currency)
-    raise Error, I18n.t('errors.billing.same_currency') if target_currency == account.billing_currency
-    raise Error, I18n.t('errors.billing.stripe_customer_not_configured') if stripe_customer_id.blank?
-  end
-
-  # Exactly one live subscription in a switchable state (paid or default plan). Anything else (pending or extra) is rejected.
-  def eligible_active_subscription!
-    subscription = live_subscriptions.first
-    eligible = live_subscriptions.one? && SWITCHABLE_STATUSES.include?(subscription.status)
-    raise Error, I18n.t('errors.billing.switch_requires_active_subscription') unless eligible
-
-    subscription
-  end
-
-  def resolve_plan!(subscription)
-    plan = current_plan(subscription)
-    raise Error, I18n.t('errors.billing.unknown_plan') if plan.blank?
-
-    plan
-  end
-
-  def change_for(subscription, plan)
+  def change_for(subscription, new_price_id)
     {
-      new_price_id: resolve_new_price_id(plan),
-      original_price_id: subscription['plan']['id'],
+      new_price_id: new_price_id,
       quantity: subscription['quantity'],
       # Paid plans preserve paid-through (new sub trials until then); the free default plan switches
       # immediately to an active sub, so a default-plan account can switch again any time.
-      paid_through: default_price?(subscription) ? nil : subscription_period_end(subscription),
+      paid_through: Enterprise::Billing::PlanConfiguration.default_price?(subscription['plan']['id']) ? nil : subscription_period_end(subscription),
       key: subscription.id
     }
-  end
-
-  def resolve_new_price_id(plan)
-    target_prices = Enterprise::Billing::PlanConfiguration.price_ids_by_currency(plan)[target_currency]
-    raise Error, I18n.t('errors.billing.currency_not_available_for_plan') if target_prices.blank?
-
-    target_prices.first
-  end
-
-  def current_plan(subscription)
-    plan, = Enterprise::Billing::PlanConfiguration.find_plan_by_price_id(subscription['plan']['id'])
-    plan || Enterprise::Billing::PlanConfiguration.find_plan_by_product_id(subscription['plan']['product'])
-  end
-
-  # Cancel the old sub, create the new-currency sub; revert to the original plan on failure.
-  # prorate:false (Stripe can't mix currencies); trial_end keeps the already-paid time.
-  def replace_subscription(subscription, change)
-    cancel_subscription(subscription)
-
-    begin
-      create_currency_subscription(change[:new_price_id], change, 'switch')
-    rescue Stripe::StripeError => e
-      create_currency_subscription(change[:original_price_id], change, 'switch-revert')
-      raise Error, e.message
-    end
-  end
-
-  def cancel_subscription(subscription)
-    Stripe::Subscription.update(subscription.id, metadata: { SWITCH_METADATA_KEY => 'true' })
-    Stripe::Subscription.cancel(subscription.id, { prorate: false })
-  rescue Stripe::StripeError
-    # Clear the flag so a still-live sub isn't permanently skipped by the webhook guard.
-    Stripe::Subscription.update(subscription.id, metadata: { SWITCH_METADATA_KEY => '' })
-    raise
-  end
-
-  def create_currency_subscription(price_id, change, key_prefix)
-    params = { customer: stripe_customer_id, items: [{ price: price_id, quantity: change[:quantity] }] }
-    params[:trial_end] = change[:paid_through] if change[:paid_through].present? && change[:paid_through] > Time.current.to_i
-    Stripe::Subscription.create(params, { idempotency_key: "#{key_prefix}-#{account.id}-#{change[:key]}" })
   end
 
   def build_custom_attributes(subscription, plan)
@@ -133,52 +73,15 @@ class Enterprise::Billing::SwitchCurrencyService
     )
   end
 
-  def default_price?(subscription)
-    Enterprise::Billing::PlanConfiguration.plan_contains_price_id?(
-      Enterprise::Billing::PlanConfiguration.default_plan, subscription['plan']['id']
-    )
+  def mark_pending
+    account.update!(custom_attributes: account.custom_attributes.merge(PENDING_CURRENCY_KEY => target_currency))
+  end
+
+  def clear_pending
+    account.update!(custom_attributes: account.custom_attributes.except(PENDING_CURRENCY_KEY))
   end
 
   def persist_currency(custom_attributes)
-    account.update!(custom_attributes: custom_attributes)
-  end
-
-  def sync_stripe_customer_location
-    update_customer_location(target_currency)
-  end
-
-  # Revert the customer to its current (old) currency location; account.billing_currency is still the old one here.
-  def restore_customer_location
-    update_customer_location(account.billing_currency)
-  end
-
-  def update_customer_location(currency_code)
-    Stripe::Customer.update(
-      stripe_customer_id,
-      address: { country: Enterprise::Billing::Currencies.country_for(currency_code) },
-      preferred_locales: [Enterprise::Billing::Currencies.preferred_locale_for(currency_code)]
-    )
-  end
-
-  def all_subscriptions
-    @all_subscriptions ||= Stripe::Subscription.list(customer: stripe_customer_id, status: 'all', limit: 100).data
-  end
-
-  def live_subscriptions
-    @live_subscriptions ||= all_subscriptions.reject { |subscription| TERMINAL_STATUSES.include?(subscription.status) }
-  end
-
-  def validate_payment_method!
-    customer = Stripe::Customer.retrieve(stripe_customer_id)
-    return if customer.invoice_settings.default_payment_method.present? || customer.default_source.present?
-
-    payment_methods = Stripe::PaymentMethod.list(customer: stripe_customer_id, limit: 1)
-    raise Error, I18n.t('errors.billing.no_payment_method') if payment_methods.data.empty?
-
-    Stripe::Customer.update(stripe_customer_id, invoice_settings: { default_payment_method: payment_methods.data.first.id })
-  end
-
-  def stripe_customer_id
-    account.custom_attributes['stripe_customer_id']
+    account.update!(custom_attributes: custom_attributes.except(PENDING_CURRENCY_KEY))
   end
 end
