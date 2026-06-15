@@ -97,7 +97,7 @@ describe Enterprise::Billing::CreateStripeCustomerService do
       create_stripe_customer_service.new(account: account).perform
 
       expect(Stripe::Customer).to have_received(:create).with(
-        { name: account.name, email: admin1.email, address: { country: 'US' }, preferred_locales: ['en'] }
+        { name: account.name, email: admin1.email }
       )
       expect(Stripe::Subscription)
         .to have_received(:create)
@@ -114,6 +114,20 @@ describe Enterprise::Billing::CreateStripeCustomerService do
           subscription_ends_on: subscription_ends_on,
           billing_currency: 'usd'
         }.with_indifferent_access
+      )
+    end
+
+    it 'sets the billing country override when the account currency requires it' do
+      account.update!(custom_attributes: { billing_currency: 'brl' })
+      customer = double
+      allow(Stripe::Customer).to receive(:create).and_return(customer)
+      allow(customer).to receive(:id).and_return('cus_random_number')
+      allow(Stripe::Subscription).to receive(:create).and_return(created_subscription)
+
+      create_stripe_customer_service.new(account: account).perform
+
+      expect(Stripe::Customer).to have_received(:create).with(
+        { name: account.name, email: admin1.email, address: { country: 'BR' }, preferred_locales: ['pt-BR'] }
       )
     end
   end

@@ -255,7 +255,7 @@
   description: 'Config to store stripe plans for cloud'
 - name: CHATWOOT_CLOUD_TOPUP_OPTIONS
   display_title: 'Cloud Topup Options'
-  value:
+  value: {}
   description: 'Currency-keyed AI credit top-up packages, e.g. {"usd":[{"credits":1000,"amount":20.0}],"brl":[{"credits":1000,"amount":100.0}]}'
   type: code
 - name: CHATWOOT_CLOUD_PLAN_FEATURES

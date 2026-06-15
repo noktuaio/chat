@@ -25,7 +25,7 @@ module Enterprise::Billing::PlanConfiguration
   # Price id for `plan` in `currency`, falling back to usd then any configured price.
   def price_id_for(plan, currency)
     by_currency = price_ids_by_currency(plan)
-    code = Enterprise::Billing::Currencies.coerce(currency)
+    code = Enterprise::Billing::Currencies.to_supported(currency)
 
     (by_currency[code].presence ||
      by_currency[Enterprise::Billing::Currencies::DEFAULT].presence ||

@@ -9,13 +9,13 @@ module Enterprise::Billing::Currencies
     'pt_BR' => 'brl'
   }.freeze
 
+  # Billing country override per currency; absent currencies (e.g. usd) keep Stripe's default.
   COUNTRY_BY_CURRENCY = {
-    'usd' => 'US',
     'brl' => 'BR'
   }.freeze
 
+  # Preferred Stripe/checkout locale per currency; absent currencies keep Stripe's default.
   PREFERRED_LOCALE_BY_CURRENCY = {
-    'usd' => 'en',
     'brl' => 'pt-BR'
   }.freeze
 
@@ -29,8 +29,8 @@ module Enterprise::Billing::Currencies
     SUPPORTED.include?(normalize(code))
   end
 
-  # Coerce arbitrary input to a usable supported code, else DEFAULT.
-  def coerce(code)
+  # Map arbitrary input to a supported code, else DEFAULT.
+  def to_supported(code)
     supported?(code) ? normalize(code) : DEFAULT
   end
 
@@ -44,10 +44,10 @@ module Enterprise::Billing::Currencies
   end
 
   def country_for(code)
-    COUNTRY_BY_CURRENCY[coerce(code)]
+    COUNTRY_BY_CURRENCY[to_supported(code)]
   end
 
   def preferred_locale_for(code)
-    PREFERRED_LOCALE_BY_CURRENCY[coerce(code)]
+    PREFERRED_LOCALE_BY_CURRENCY[to_supported(code)]
   end
 end

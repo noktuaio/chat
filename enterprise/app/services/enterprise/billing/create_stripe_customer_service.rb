@@ -23,18 +23,20 @@ class Enterprise::Billing::CreateStripeCustomerService
 
   def prepare_customer_id
     customer_id = account.custom_attributes['stripe_customer_id']
-    if customer_id.blank?
-      customer = Stripe::Customer.create(
-        {
-          name: account.name,
-          email: billing_email,
-          address: { country: Enterprise::Billing::Currencies.country_for(account.billing_currency) },
-          preferred_locales: [Enterprise::Billing::Currencies.preferred_locale_for(account.billing_currency)]
-        }
-      )
-      customer_id = customer.id
-    end
+    customer_id = Stripe::Customer.create(customer_params).id if customer_id.blank?
     customer_id
+  end
+
+  # Only currencies that need a country override (e.g. BRL/PIX) set address/locale; usd keeps Stripe defaults.
+  def customer_params
+    params = { name: account.name, email: billing_email }
+    country = Enterprise::Billing::Currencies.country_for(account.billing_currency)
+    return params if country.blank?
+
+    params.merge(
+      address: { country: country },
+      preferred_locales: [Enterprise::Billing::Currencies.preferred_locale_for(account.billing_currency)]
+    )
   end
 
   def default_quantity

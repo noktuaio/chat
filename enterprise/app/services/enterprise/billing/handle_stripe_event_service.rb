@@ -159,7 +159,7 @@ class Enterprise::Billing::HandleStripeEventService
     @account ||= Account.where("custom_attributes->>'stripe_customer_id' = ?", subscription.customer).first
   end
 
-  def find_plan(plan_id)
-    Enterprise::Billing::PlanConfiguration.find_plan_by_product_id(plan_id)
+  def find_plan(product_id)
+    Enterprise::Billing::PlanConfiguration.find_plan_by_product_id(product_id)
   end
 end
