@@ -34,22 +34,15 @@ class Enterprise::Billing::TopupCheckoutService
     topup_option = find_topup_option(credits)
     raise Error, I18n.t('errors.topup.invalid_option') unless topup_option
 
-    # Validate payment method exists
+    # Ensure a default payment method that can bill the account's currency (PIX can't pay a USD invoice).
     validate_payment_method!
 
     topup_option
   end
 
   def validate_payment_method!
-    customer = Stripe::Customer.retrieve(stripe_customer_id)
-
-    return if customer.invoice_settings.default_payment_method.present? || customer.default_source.present?
-
-    # Auto-set first payment method as default if available
-    payment_methods = Stripe::PaymentMethod.list(customer: stripe_customer_id, limit: 1)
-    raise Error, I18n.t('errors.topup.no_payment_method') if payment_methods.data.empty?
-
-    Stripe::Customer.update(stripe_customer_id, invoice_settings: { default_payment_method: payment_methods.data.first.id })
+    reconciler = Enterprise::Billing::DefaultPaymentMethodReconciler.new(account: account, currency: account.billing_currency)
+    raise Error, I18n.t('errors.topup.no_payment_method') if reconciler.reconcile.blank?
   end
 
   def charge_customer(topup_option, credits)

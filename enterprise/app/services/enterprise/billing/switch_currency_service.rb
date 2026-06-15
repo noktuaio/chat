@@ -54,6 +54,8 @@ class Enterprise::Billing::SwitchCurrencyService
   def change_for(subscription, new_price_id, default_plan:)
     {
       new_price_id: new_price_id,
+      # Original price is needed to re-create the subscription if the new-currency create fails.
+      original_price_id: subscription['plan']['id'],
       quantity: subscription['quantity'],
       # Paid plans preserve paid-through (new sub trials until then); the free default plan switches
       # immediately to an active sub, so a default-plan account can switch again any time.

@@ -24,6 +24,7 @@ describe Enterprise::Billing::SwitchCurrencyService do
 
   let(:invoice_settings) { Struct.new(:default_payment_method).new('pm_test') }
   let(:stripe_customer) { Struct.new(:invoice_settings, :default_source).new(invoice_settings, nil) }
+  let(:default_payment_methods) { [Struct.new(:id, :type).new('pm_test', 'card')] }
 
   before do
     create(:installation_config, name: 'CHATWOOT_CLOUD_PLANS', value: [
@@ -41,20 +42,21 @@ describe Enterprise::Billing::SwitchCurrencyService do
     allow(Stripe::Subscription).to receive(:cancel)
     allow(Stripe::Customer).to receive(:retrieve).and_return(stripe_customer)
     allow(Stripe::Customer).to receive(:update)
+    allow(Stripe::PaymentMethod).to receive(:list).and_return(Struct.new(:data).new(default_payment_methods))
 
     reconcile = instance_double(Enterprise::Billing::ReconcilePlanFeaturesService, perform: true)
     allow(Enterprise::Billing::ReconcilePlanFeaturesService).to receive(:new).and_return(reconcile)
   end
 
   describe '#perform' do
-    it 'creates the new-currency subscription before cancelling the old one' do
+    it 'cancels the old subscription before creating the new-currency one' do
       service.perform
 
+      expect(Stripe::Subscription).to have_received(:cancel).with('sub_usd', { prorate: false }).ordered
       expect(Stripe::Subscription).to have_received(:create).with(
         hash_including(customer: stripe_customer_id, items: [{ price: 'price_business_brl', quantity: 2 }]),
         hash_including(:idempotency_key)
       ).ordered
-      expect(Stripe::Subscription).to have_received(:cancel).with('sub_usd', { prorate: false }).ordered
     end
 
     it 'uses a per-attempt idempotency key not derived from the subscription id' do
@@ -124,26 +126,33 @@ describe Enterprise::Billing::SwitchCurrencyService do
       expect { service.perform }.to raise_error(described_class::Error, I18n.t('errors.billing.currency_not_available_for_plan'))
     end
 
-    it 'raises when the customer has no payment method' do
+    it 'completes the switch without a payment method (the user is prompted later)' do
       allow(Stripe::Customer).to receive(:retrieve).and_return(Struct.new(:invoice_settings, :default_source).new(
                                                                  Struct.new(:default_payment_method).new(nil), nil
                                                                ))
       allow(Stripe::PaymentMethod).to receive(:list).and_return(Struct.new(:data).new([]))
 
-      expect { service.perform }.to raise_error(described_class::Error, I18n.t('errors.billing.no_payment_method'))
+      expect { service.perform }.not_to raise_error
+      expect(account.reload.custom_attributes['billing_currency']).to eq('brl')
     end
 
-    context 'when creating the new subscription fails' do
+    context 'when creating the new-currency subscription fails' do
       before do
-        allow(Stripe::Subscription).to receive(:create).and_raise(Stripe::StripeError.new('card declined'))
+        # Only the new (brl) create fails; re-creating the original (usd) succeeds.
+        allow(Stripe::Subscription).to receive(:create) do |params, _opts|
+          raise Stripe::StripeError, 'cannot combine currencies' if params[:items].first[:price] == 'price_business_brl'
+
+          active_subscription
+        end
       end
 
-      it 'leaves the old subscription untouched after the failed switch' do
+      it 'cancels the old subscription then re-creates the original to restore service' do
         expect { service.perform }.to raise_error(described_class::Error)
 
-        expect(Stripe::Subscription).not_to have_received(:cancel)
-        # The target (brl) location override was pushed before the create attempt failed.
-        expect(Stripe::Customer).to have_received(:update).with(stripe_customer_id, hash_including(address: { country: 'BR' }))
+        expect(Stripe::Subscription).to have_received(:cancel).with('sub_usd', { prorate: false })
+        expect(Stripe::Subscription).to have_received(:create).with(
+          hash_including(items: [{ price: 'price_business_usd', quantity: 2 }]), anything
+        )
       end
 
       it 'keeps the account on the original currency and clears the pending marker' do
@@ -214,6 +223,34 @@ describe Enterprise::Billing::SwitchCurrencyService do
           stripe_customer_id, hash_including(address: { country: '' }, preferred_locales: [])
         )
         expect(account.reload.custom_attributes['billing_currency']).to eq('usd')
+      end
+
+      context 'when the default payment method cannot bill the new currency' do
+        let(:pix) { Struct.new(:id, :type).new('pm_pix', 'pix') }
+        let(:card) { Struct.new(:id, :type).new('pm_card', 'card') }
+
+        before do
+          allow(Stripe::Customer).to receive(:retrieve).and_return(
+            Struct.new(:invoice_settings, :default_source).new(Struct.new(:default_payment_method).new('pm_pix'), nil)
+          )
+        end
+
+        it 'switches the default to an attached compatible card' do
+          allow(Stripe::PaymentMethod).to receive(:list).and_return(Struct.new(:data).new([pix, card]))
+
+          service.perform
+
+          expect(Stripe::Customer).to have_received(:update).with(stripe_customer_id, invoice_settings: { default_payment_method: 'pm_card' })
+        end
+
+        it 'unsets the default when no compatible method is attached' do
+          allow(Stripe::PaymentMethod).to receive(:list).and_return(Struct.new(:data).new([pix]))
+
+          service.perform
+
+          expect(Stripe::Customer).to have_received(:update).with(stripe_customer_id, invoice_settings: { default_payment_method: '' })
+          expect(account.reload.custom_attributes['billing_currency']).to eq('usd')
+        end
       end
     end
   end

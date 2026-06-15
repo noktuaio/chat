@@ -1,8 +1,8 @@
-# Performs the Stripe-side currency switch: sync the customer location, create the new-currency
-# subscription, then cancel the old one. Stripe can't change a subscription's currency in place and
-# can't prorate across currencies, so the switch is a cancel + recreate. Creating the new sub *before*
-# cancelling the old one means any failure leaves the customer on their original subscription rather
-# than with none — the whole operation self-reverts.
+# Performs the Stripe-side currency switch: sync the customer location, cancel the old-currency
+# subscription, then create the new-currency one. Stripe can't change a subscription's currency in
+# place, can't prorate across currencies, and forbids two currencies on a single customer — so the old
+# subscription must be cancelled *before* the new one can be created. If the create fails afterwards we
+# re-create the original (its currency is free again) so the customer isn't left without a subscription.
 class Enterprise::Billing::StripeCurrencySwitchExecutor
   class Error < StandardError; end
 
@@ -10,7 +10,7 @@ class Enterprise::Billing::StripeCurrencySwitchExecutor
 
   # Returns the newly-created Stripe subscription.
   def execute(subscription:, change:)
-    validate_payment_method! unless change[:default_plan]
+    reconcile_default_payment_method unless change[:default_plan]
 
     previous_currency = account.billing_currency
     sync_customer_location(target_currency)
@@ -27,18 +27,19 @@ class Enterprise::Billing::StripeCurrencySwitchExecutor
   private
 
   def replace_subscription(subscription, change)
-    new_subscription = create_currency_subscription(change[:new_price_id], change)
-    cancel_old_subscription(subscription, new_subscription)
-    new_subscription
+    cancel_subscription(subscription)
+    create_or_revert(change)
   rescue Stripe::StripeError => e
+    # Reaches here only if cancel itself failed (old sub still active) or the revert create failed.
     raise Error, e.message
   end
 
-  def cancel_old_subscription(old_subscription, new_subscription)
-    cancel_subscription(old_subscription)
+  def create_or_revert(change)
+    create_currency_subscription(change[:new_price_id], change, idempotency_key)
   rescue Stripe::StripeError
-    # Couldn't retire the old sub: cancel the just-created one so the customer keeps a single subscription.
-    Stripe::Subscription.cancel(new_subscription.id, { prorate: false })
+    # Old sub is already cancelled; re-create the original so the customer keeps a subscription, then
+    # surface the original failure.
+    create_currency_subscription(change[:original_price_id], change, revert_idempotency_key)
     raise
   end
 
@@ -51,27 +52,31 @@ class Enterprise::Billing::StripeCurrencySwitchExecutor
     raise
   end
 
-  def create_currency_subscription(price_id, change)
+  def create_currency_subscription(price_id, change, idempotency_key)
     params = { customer: stripe_customer_id, items: [{ price: price_id, quantity: change[:quantity] }] }
     # trial_end preserves the already-paid time so switching mid-cycle doesn't double-charge.
     params[:trial_end] = change[:paid_through] if change[:paid_through].present? && change[:paid_through] > Time.current.to_i
     Stripe::Subscription.create(params, { idempotency_key: idempotency_key })
   end
 
-  # Fresh per switch attempt: a retry after a rolled-back (cancelled) create must create a new
-  # subscription, not replay Stripe's stored response for the now-cancelled one.
-  def idempotency_key
-    @idempotency_key ||= "switch-#{account.id}-#{SecureRandom.uuid}"
+  # Distinct keys per switch attempt: a retry must never replay a cancelled subscription, and the
+  # revert create must never be conflated with the forward create.
+  def attempt_token
+    @attempt_token ||= SecureRandom.uuid
   end
 
-  def validate_payment_method!
-    customer = Stripe::Customer.retrieve(stripe_customer_id)
-    return if customer.invoice_settings.default_payment_method.present? || customer.default_source.present?
+  def idempotency_key
+    "switch-#{account.id}-#{attempt_token}"
+  end
 
-    payment_methods = Stripe::PaymentMethod.list(customer: stripe_customer_id, limit: 1)
-    raise Error, I18n.t('errors.billing.no_payment_method') if payment_methods.data.empty?
+  def revert_idempotency_key
+    "switch-revert-#{account.id}-#{attempt_token}"
+  end
 
-    Stripe::Customer.update(stripe_customer_id, invoice_settings: { default_payment_method: payment_methods.data.first.id })
+  # Drop a default that can't bill the new currency (e.g. PIX on a USD switch) and pick a compatible one
+  # if attached; leaving none is fine — the user is prompted to add a method before the next charge.
+  def reconcile_default_payment_method
+    Enterprise::Billing::DefaultPaymentMethodReconciler.new(account: account, currency: target_currency).reconcile
   end
 
   # Currencies that need a country override (e.g. BRL/PIX) push it to Stripe; for currencies without

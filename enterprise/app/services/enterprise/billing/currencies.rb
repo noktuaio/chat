@@ -19,6 +19,13 @@ module Enterprise::Billing::Currencies
     'brl' => 'pt-BR'
   }.freeze
 
+  # Stripe payment method types locked to a single currency; any type not listed (e.g. card) bills
+  # in any currency. Used to drop a method that can't pay the customer's currency (PIX/boleto are BRL-only).
+  CURRENCY_LOCKED_PAYMENT_METHOD_TYPES = {
+    'pix' => 'brl',
+    'boleto' => 'brl'
+  }.freeze
+
   module_function
 
   def normalize(code)
@@ -44,5 +51,11 @@ module Enterprise::Billing::Currencies
 
   def preferred_locale_for(code)
     PREFERRED_LOCALE_BY_CURRENCY[to_supported(code)]
+  end
+
+  # Can a payment method of this Stripe type bill the given currency?
+  def payment_method_supports?(payment_method_type, code)
+    locked_currency = CURRENCY_LOCKED_PAYMENT_METHOD_TYPES[payment_method_type.to_s]
+    locked_currency.nil? || locked_currency == to_supported(code)
   end
 end
