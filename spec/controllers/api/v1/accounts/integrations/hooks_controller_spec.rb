@@ -40,7 +40,8 @@ RSpec.describe 'Integration Hooks API', type: :request do
       end
 
       it 'validates Cloudflare RealtimeKit credentials before creating the hook' do
-        allow(Integrations::Cloudflare::RealtimeKitCredentialsValidator).to receive(:valid?).and_return(false)
+        allow(Integrations::Cloudflare::RealtimeKitCredentialsValidator).to receive(:validate)
+          .and_return(Integrations::Cloudflare::RealtimeKitCredentialsValidator::Result.new(false, :invalid_api_token))
 
         post api_v1_account_integrations_hooks_url(account_id: account.id),
              params: { app_id: 'dyte', settings: { account_id: 'bad', app_id: 'bad', api_token: 'bad' } },
@@ -48,7 +49,7 @@ RSpec.describe 'Integration Hooks API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unprocessable_entity)
-        expect(response.parsed_body['message']).to include(I18n.t('errors.cloudflare.realtimekit.invalid_credentials'))
+        expect(response.parsed_body['message']).to include(I18n.t('errors.cloudflare.realtimekit.invalid_api_token'))
       end
     end
   end

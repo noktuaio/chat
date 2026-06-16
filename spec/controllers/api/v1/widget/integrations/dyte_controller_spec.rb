@@ -16,7 +16,8 @@ RSpec.describe '/api/v1/widget/integrations/dyte', type: :request do
   end
 
   before do
-    allow(Integrations::Cloudflare::RealtimeKitCredentialsValidator).to receive(:valid?).and_return(true)
+    allow(Integrations::Cloudflare::RealtimeKitCredentialsValidator).to receive(:validate)
+      .and_return(Integrations::Cloudflare::RealtimeKitCredentialsValidator::Result.new(true, nil))
     create(:integrations_hook, :dyte, account: account)
   end
 

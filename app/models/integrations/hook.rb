@@ -130,9 +130,10 @@ class Integrations::Hook < ApplicationRecord
   end
 
   def validate_cloudflare_realtimekit_credentials
-    return if Integrations::Cloudflare::RealtimeKitCredentialsValidator.valid?(*settings_cloudflare_realtimekit_credentials(settings))
+    result = Integrations::Cloudflare::RealtimeKitCredentialsValidator.validate(*settings_cloudflare_realtimekit_credentials(settings))
+    return if result.success?
 
-    errors.add(:base, I18n.t('errors.cloudflare.realtimekit.invalid_credentials'))
+    errors.add(:base, I18n.t("errors.cloudflare.realtimekit.#{result.error}"))
   end
 
   def settings_api_key(value)

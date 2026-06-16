@@ -12,12 +12,14 @@ RSpec.describe Integrations::Cloudflare::RealtimeKitCredentialsValidator do
     stub_apps_list([{ id: app_id }])
 
     expect(described_class.valid?(account_id, app_id, api_token)).to be true
+    expect(described_class.validate(account_id, app_id, api_token).success?).to be true
   end
 
   it 'rejects inactive tokens' do
     stub_token_verify(status: 'disabled')
 
     expect(described_class.valid?(account_id, app_id, api_token)).to be false
+    expect(described_class.validate(account_id, app_id, api_token).error).to eq(:invalid_api_token)
   end
 
   it 'rejects tokens without access to the Cloudflare account' do
@@ -25,6 +27,7 @@ RSpec.describe Integrations::Cloudflare::RealtimeKitCredentialsValidator do
     stub_apps_request.to_return(status: 403, body: { success: false }.to_json)
 
     expect(described_class.valid?(account_id, app_id, api_token)).to be false
+    expect(described_class.validate(account_id, app_id, api_token).error).to eq(:invalid_account_or_permissions)
   end
 
   it 'rejects a RealtimeKit App ID that is not present in the account' do
@@ -32,12 +35,14 @@ RSpec.describe Integrations::Cloudflare::RealtimeKitCredentialsValidator do
     stub_apps_list([{ id: 'another_app_id' }])
 
     expect(described_class.valid?(account_id, app_id, api_token)).to be false
+    expect(described_class.validate(account_id, app_id, api_token).error).to eq(:app_not_found)
   end
 
   it 'rejects blank credentials without making a network call' do
     expect(described_class.valid?(nil, app_id, api_token)).to be false
     expect(described_class.valid?(account_id, nil, api_token)).to be false
     expect(described_class.valid?(account_id, app_id, nil)).to be false
+    expect(described_class.validate(nil, app_id, api_token).error).to eq(:missing_credentials)
   end
 
   it 'treats transient Cloudflare failures as valid to avoid blocking saves' do

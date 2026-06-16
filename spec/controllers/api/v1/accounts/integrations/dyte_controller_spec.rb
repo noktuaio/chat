@@ -15,7 +15,8 @@ RSpec.describe 'Dyte Integration API', type: :request do
   let(:unauthorized_agent) { create(:user, account: account, role: :agent) }
 
   before do
-    allow(Integrations::Cloudflare::RealtimeKitCredentialsValidator).to receive(:valid?).and_return(true)
+    allow(Integrations::Cloudflare::RealtimeKitCredentialsValidator).to receive(:validate)
+      .and_return(Integrations::Cloudflare::RealtimeKitCredentialsValidator::Result.new(true, nil))
     create(:integrations_hook, :dyte, account: account)
     create(:inbox_member, user: agent, inbox: conversation.inbox)
   end
