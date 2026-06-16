@@ -1,6 +1,4 @@
 class Twilio::CallbackController < ApplicationController
-  include TwilioSignatureVerifyConcern
-
   def create
     Webhooks::TwilioEventsJob.perform_later(permitted_params.to_unsafe_hash)
 
@@ -33,7 +31,21 @@ class Twilio::CallbackController < ApplicationController
       :Latitude,
       :Longitude,
       :MessageType,
-      :ProfileName
+      :ProfileName,
+      :ExternalUserId,
+      :ParentExternalUserId,
+      :ProfileUsername,
+      :Username,
+      :ReferralBody,
+      :ReferralHeadline,
+      :ReferralSourceId,
+      :ReferralSourceType,
+      :ReferralSourceUrl,
+      :ReferralMediaId,
+      :ReferralMediaContentType,
+      :ReferralMediaUrl,
+      :ReferralNumMedia,
+      :ReferralCtwaClid
     )
   end
 end
