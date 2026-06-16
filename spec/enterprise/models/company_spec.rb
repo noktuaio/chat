@@ -1,6 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe Company, type: :model do
+  include ActiveJob::TestHelper
+
   context 'with validations' do
     it { is_expected.to validate_presence_of(:account_id) }
     it { is_expected.to validate_presence_of(:name) }
@@ -44,6 +46,32 @@ RSpec.describe Company, type: :model do
       company.record_activity_at!(1.hour.ago)
 
       expect(company.reload.last_activity_at).to be_within(1.second).of(original_activity_at)
+    end
+  end
+
+  describe 'contact company name sync' do
+    let(:account) { create(:account) }
+    let(:company) { create(:company, account: account, name: 'Acme') }
+
+    it 'updates linked contact company names when the company name changes' do
+      contact = create(:contact, account: account, company: company, additional_attributes: { 'company_name' => 'Acme', 'city' => 'Berlin' })
+
+      perform_enqueued_jobs(only: Companies::SyncContactNamesJob) do
+        company.update!(name: 'Acme Labs')
+      end
+
+      expect(contact.reload.additional_attributes).to eq('company_name' => 'Acme Labs', 'city' => 'Berlin')
+    end
+
+    it 'clears linked contact company names when the company is deleted' do
+      contact = create(:contact, account: account, company: company, additional_attributes: { 'company_name' => 'Acme', 'city' => 'Berlin' })
+
+      perform_enqueued_jobs(only: Companies::SyncContactNamesJob) do
+        company.destroy!
+      end
+
+      expect(contact.reload.company_id).to be_nil
+      expect(contact.additional_attributes).to eq('city' => 'Berlin')
     end
   end
 end
