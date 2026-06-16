@@ -3,9 +3,10 @@ namespace :storage do
   task migrate: :environment do
     from_service = ENV.fetch('FROM', nil)
     to_service = ENV.fetch('TO', nil)
+    update_service_name = ActiveModel::Type::Boolean.new.cast(ENV.fetch('UPDATE_BLOB_SERVICE_NAME', true))
 
     raise 'Missing FROM or TO argument. Usage: FROM=service_name TO=service_name rake storage:migrate' if from_service.nil? || to_service.nil?
 
-    ActiveStorage::Migrator.migrate(from_service.to_sym, to_service.to_sym)
+    ActiveStorage::Migrator.migrate(from_service.to_sym, to_service.to_sym, update_service_name: update_service_name)
   end
 end
