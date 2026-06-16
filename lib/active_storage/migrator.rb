@@ -1,11 +1,7 @@
 require 'yaml'
 require 'erb'
-require 'logger'
 
 class ActiveStorage::Migrator
-  Rails.logger = Logger.new($stdout)
-  Rails.logger.level = Logger::DEBUG
-
   def self.migrate(from_service_name, to_service_name, update_service_name: true)
     configs = load_storage_config
     # Check if services are configured correctly

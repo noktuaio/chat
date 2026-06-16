@@ -24,6 +24,14 @@ RSpec.describe ActiveStorage::Migrator do
 
         described_class.migrate('local', 'amazon', update_service_name: false)
       end
+
+      it 'does not override the application logger' do
+        allow(described_class).to receive(:migrate_blobs)
+
+        expect(Rails).not_to receive(:logger=)
+
+        described_class.migrate('local', 'amazon')
+      end
     end
 
     context 'when services are not configured correctly' do
