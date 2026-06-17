@@ -59,10 +59,10 @@ module Enterprise::AutoAssignment::AssignmentService
   def unassigned_conversations(limit)
     scope = inbox.conversations.unassigned.open
 
-    # Skip stale backlog beyond the assignment policy's age threshold (defaults to 7 days)
+    # First apply the assignment policy's age exclusion (defaults to 7 days)
     scope = apply_age_exclusions(scope, policy&.exclude_older_than_hours)
 
-    # Apply exclusion rules from capacity policy
+    # Then apply the capacity policy's exclusion rules (labels and age)
     scope = apply_exclusion_rules(scope)
 
     # Apply conversation priority using enum methods if policy exists
