@@ -2,10 +2,9 @@
 
 require 'rails_helper'
 
-RSpec.describe Enterprise::Api::V1::AccountsSettings do
+RSpec.describe Internal::Accounts::MarketingAttributionService do
   let(:account) { create(:account) }
   let(:cookies) { {} }
-  let(:controller) { test_controller.new(account, cookies) }
 
   before do
     allow(ChatwootApp).to receive(:chatwoot_cloud?).and_return(true)
@@ -23,7 +22,7 @@ RSpec.describe Enterprise::Api::V1::AccountsSettings do
       'source_type' => 'referral'
     )
 
-    controller.create
+    described_class.new(account: account, cookies: cookies).perform
 
     attribution = account.reload.internal_attributes['marketing_attribution']
     expect(attribution['captured_from']).to eq('cookie')
@@ -36,27 +35,12 @@ RSpec.describe Enterprise::Api::V1::AccountsSettings do
     allow(ChatwootApp).to receive(:chatwoot_cloud?).and_return(false)
     cookies[described_class::LAST_TOUCH_COOKIE] = encoded_cookie('source' => 'reddit')
 
-    controller.create
+    described_class.new(account: account, cookies: cookies).perform
 
     expect(account.reload.internal_attributes).not_to include('marketing_attribution')
   end
 
   def encoded_cookie(payload)
     CGI.escape(payload.to_json)
-  end
-
-  def test_controller
-    Class.new do
-      prepend Enterprise::Api::V1::AccountsSettings
-
-      attr_reader :cookies
-
-      def initialize(account, cookies)
-        @account = account
-        @cookies = cookies
-      end
-
-      def create; end
-    end
   end
 end
