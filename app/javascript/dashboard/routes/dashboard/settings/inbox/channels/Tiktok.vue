@@ -85,11 +85,9 @@ const requestAuthorization = async () => {
                 icon="i-lucide-triangle-alert"
                 class="flex-shrink-0 size-4 mt-0.5"
               />
-              <div class="flex flex-col gap-1">
-                <span>
-                  {{ $t('INBOX_MGMT.ADD.TIKTOK.NORTH_AMERICA_WARNING') }}
-                </span>
-              </div>
+              <span>
+                {{ $t('INBOX_MGMT.ADD.TIKTOK.NORTH_AMERICA_WARNING') }}
+              </span>
             </div>
           </Banner>
         </div>
