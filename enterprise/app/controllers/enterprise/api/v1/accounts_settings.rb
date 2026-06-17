@@ -9,26 +9,14 @@ module Enterprise::Api::V1::AccountsSettings
 
   private
 
+  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   def record_marketing_attribution
-    return unless ChatwootApp.chatwoot_cloud?
-    return if @account.blank?
+    return unless ChatwootApp.chatwoot_cloud? && @account
 
-    first_touch, last_touch = attribution_cookies
-    return if first_touch.blank? && last_touch.blank?
+    first_touch = attribution_cookie(FIRST_TOUCH_COOKIE)
+    last_touch = attribution_cookie(LAST_TOUCH_COOKIE)
+    return unless first_touch || last_touch
 
-    store_marketing_attribution(first_touch, last_touch)
-  rescue StandardError => e
-    ChatwootExceptionTracker.new(e).capture_exception
-  end
-
-  def attribution_cookies
-    [
-      attribution_cookie(FIRST_TOUCH_COOKIE),
-      attribution_cookie(LAST_TOUCH_COOKIE)
-    ]
-  end
-
-  def store_marketing_attribution(first_touch, last_touch)
     existing_attribution = @account.internal_attributes['marketing_attribution'] || {}
     @account.update!(
       internal_attributes: @account.internal_attributes.merge(
@@ -40,14 +28,13 @@ module Enterprise::Api::V1::AccountsSettings
         }
       )
     )
+  rescue StandardError => e
+    ChatwootExceptionTracker.new(e).capture_exception
   end
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
   def attribution_cookie(cookie_name)
-    return if cookies[cookie_name].blank?
-
-    JSON.parse(CGI.unescape(cookies[cookie_name].to_s))
-  rescue JSON::ParserError, ArgumentError
-    nil
+    JSON.parse(CGI.unescape(cookies[cookie_name].to_s)) if cookies[cookie_name].present?
   end
 
   def permitted_settings_attributes
