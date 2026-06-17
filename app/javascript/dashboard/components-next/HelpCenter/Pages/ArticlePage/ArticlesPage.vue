@@ -451,6 +451,7 @@ watch(
         <ArticleList
           :articles="articles"
           :is-category-articles="isCategoryArticles"
+          :is-searching="isSearching"
           :selected-article-ids="selectedArticleIds"
           class="relative z-0"
           @translate-article="handleTranslateArticle"
