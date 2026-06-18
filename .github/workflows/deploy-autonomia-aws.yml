@@ -1,0 +1,87 @@
+name: Deploy Autonomia Chatwoot to AWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-autonomia-aws-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_ACCOUNT_ID: '140023375763'
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::140023375763:role/chatwoot-autonomia-prod-github-actions-deploy
+  ECR_REPOSITORY: chatwoot-autonomia-prod
+  EKS_CLUSTER_NAME: chatwoot-autonomia-prod-eks
+  KUBE_NAMESPACE: chatwoot
+  STABLE_IMAGE_TAG: autonomia-custom-image-port-ce
+
+jobs:
+  build-and-deploy:
+    name: Build, Push, and Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Prepare Chatwoot CE image
+        run: |
+          rm -rf enterprise spec/enterprise
+          sed -i 's|FROM node:24-alpine as node|FROM public.ecr.aws/docker/library/node:24-alpine as node|' docker/Dockerfile
+          sed -i 's|FROM ruby:3.4.4-alpine3.21|FROM public.ecr.aws/docker/library/ruby:3.4.4-alpine3.21|g' docker/Dockerfile
+          echo 'ENV CW_EDITION="ce"' >> docker/Dockerfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.STABLE_IMAGE_TAG }}
+          cache-from: type=gha,scope=chatwoot-autonomia-prod-linux-amd64
+          cache-to: type=gha,mode=max,scope=chatwoot-autonomia-prod-linux-amd64
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+
+      - name: Deploy image
+        env:
+          IMAGE_URI: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          kubectl set image deployment/chatwoot-web chatwoot-web="$IMAGE_URI" -n "$KUBE_NAMESPACE"
+          kubectl set image deployment/chatwoot-worker chatwoot-workers="$IMAGE_URI" -n "$KUBE_NAMESPACE"
+          kubectl rollout status deployment/chatwoot-web -n "$KUBE_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/chatwoot-worker -n "$KUBE_NAMESPACE" --timeout=300s
+
+      - name: Verify public SSO redirect
+        run: |
+          location=$(curl -sI https://agents.autonomia.site/auth/autonomia | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\r')
+          echo "$location"
+          test -n "$location"
+          echo "$location" | grep -F 'client_id=talkai'
+          echo "$location" | grep -F 'redirect_uri=https%3A%2F%2Fagents.autonomia.site%2Fauth%2Fautonomia%2Fcallback'

@@ -18,6 +18,10 @@ output "ecr_repository_url" {
   value = aws_ecr_repository.chatwoot.repository_url
 }
 
+output "github_actions_deploy_role_arn" {
+  value = aws_iam_role.github_actions_deploy.arn
+}
+
 output "rds_endpoint" {
   value = aws_db_instance.chatwoot.address
 }

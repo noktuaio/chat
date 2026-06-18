@@ -5,10 +5,11 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  name          = "${var.project}-${var.environment}"
-  cluster_name  = "${local.name}-eks"
-  ecr_image_url = "${aws_ecr_repository.chatwoot.repository_url}:${var.image_tag}"
-  azs           = slice(data.aws_availability_zones.available.names, 0, 2)
+  name                             = "${var.project}-${var.environment}"
+  cluster_name                     = "${local.name}-eks"
+  ecr_image_url                    = "${aws_ecr_repository.chatwoot.repository_url}:${var.image_tag}"
+  github_actions_oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
+  azs                              = slice(data.aws_availability_zones.available.names, 0, 2)
 
   tags = {
     Project     = var.project
@@ -527,6 +528,117 @@ resource "terraform_data" "build_image" {
 
 data "tls_certificate" "eks_oidc" {
   url = aws_eks_cluster.this.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_role" "github_actions_deploy" {
+  name = "${local.name}-github-actions-deploy"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = local.github_actions_oidc_provider_arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:${var.github_actions_repository}:ref:refs/heads/${var.github_branch}",
+            "repo:${var.github_actions_repository}:environment:production"
+          ]
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "github_actions_deploy" {
+  name = "${local.name}-github-actions-deploy"
+  role = aws_iam_role.github_actions_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:BatchGetImage",
+          "ecr:CompleteLayerUpload",
+          "ecr:DescribeImages",
+          "ecr:DescribeRepositories",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart"
+        ]
+        Resource = aws_ecr_repository.chatwoot.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:DescribeCluster"
+        ]
+        Resource = aws_eks_cluster.this.arn
+      }
+    ]
+  })
+}
+
+resource "aws_eks_access_entry" "github_actions_deploy" {
+  cluster_name      = aws_eks_cluster.this.name
+  kubernetes_groups = ["chatwoot-deployers"]
+  principal_arn     = aws_iam_role.github_actions_deploy.arn
+  type              = "STANDARD"
+}
+
+resource "kubernetes_role" "github_actions_deploy" {
+  metadata {
+    name      = "github-actions-deploy"
+    namespace = kubernetes_namespace.chatwoot.metadata[0].name
+  }
+
+  rule {
+    api_groups = ["apps"]
+    resources  = ["deployments"]
+    verbs      = ["get", "list", "watch", "patch", "update"]
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods"]
+    verbs      = ["get", "list", "watch"]
+  }
+}
+
+resource "kubernetes_role_binding" "github_actions_deploy" {
+  metadata {
+    name      = "github-actions-deploy"
+    namespace = kubernetes_namespace.chatwoot.metadata[0].name
+  }
+
+  subject {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Group"
+    name      = "chatwoot-deployers"
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role.github_actions_deploy.metadata[0].name
+  }
 }
 
 resource "aws_iam_openid_connect_provider" "eks" {

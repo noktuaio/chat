@@ -38,6 +38,11 @@ variable "github_branch" {
   default = "main"
 }
 
+variable "github_actions_repository" {
+  type    = string
+  default = "noktuaio/chatwoot"
+}
+
 variable "image_tag" {
   type    = string
   default = "autonomia-custom-image-port-ce"
