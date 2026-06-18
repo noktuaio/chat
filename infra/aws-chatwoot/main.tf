@@ -9,7 +9,14 @@ locals {
   cluster_name                     = "${local.name}-eks"
   ecr_image_url                    = "${aws_ecr_repository.chatwoot.repository_url}:${var.image_tag}"
   github_actions_oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
-  azs                              = slice(data.aws_availability_zones.available.names, 0, 2)
+  github_actions_repositories      = distinct(concat([var.github_actions_repository], var.github_actions_extra_repositories))
+  github_actions_subjects = flatten([
+    for repository in local.github_actions_repositories : [
+      "repo:${repository}:ref:refs/heads/${var.github_branch}",
+      "repo:${repository}:environment:production"
+    ]
+  ])
+  azs = slice(data.aws_availability_zones.available.names, 0, 2)
 
   tags = {
     Project     = var.project
@@ -386,10 +393,7 @@ resource "aws_iam_role" "github_actions_deploy" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = [
-            "repo:${var.github_actions_repository}:ref:refs/heads/${var.github_branch}",
-            "repo:${var.github_actions_repository}:environment:production"
-          ]
+          "token.actions.githubusercontent.com:sub" = local.github_actions_subjects
         }
       }
     }]

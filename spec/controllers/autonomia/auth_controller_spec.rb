@@ -29,6 +29,7 @@ RSpec.describe 'Autonomia::AuthController', type: :request do
       expect(params['code_challenge']).to be_present
       expect(params['code_challenge_method']).to eq('S256')
       expect(params['state']).to be_present
+      expect(params['state']).to match(/\A[A-Za-z0-9_-]+\z/)
     end
   end
 

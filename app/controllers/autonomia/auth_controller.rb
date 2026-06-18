@@ -56,22 +56,39 @@ class Autonomia::AuthController < ApplicationController
   end
 
   def encode_state(code_verifier:, return_to:)
-    state_encryptor.encrypt_and_sign(
+    encrypted_state = state_encryptor.encrypt_and_sign(
       { code_verifier: code_verifier, return_to: return_to },
       expires_in: STATE_TTL,
       purpose: STATE_PURPOSE
     )
+    Base64.urlsafe_encode64(encrypted_state, padding: false)
   end
 
   def decode_state
-    state = state_encryptor.decrypt_and_verify(params[:state].to_s, purpose: STATE_PURPOSE)
+    state = state_candidates(params[:state].to_s).filter_map do |candidate|
+      state_encryptor.decrypt_and_verify(candidate, purpose: STATE_PURPOSE)
+    rescue ActiveSupport::MessageEncryptor::InvalidMessage, ActiveSupport::MessageVerifier::InvalidSignature
+      nil
+    end.first
     return if state.blank?
 
     state = state.with_indifferent_access
     return if state[:code_verifier].blank?
 
     state
-  rescue ActiveSupport::MessageEncryptor::InvalidMessage, ActiveSupport::MessageVerifier::InvalidSignature
+  end
+
+  def state_candidates(raw_state)
+    [
+      decode_urlsafe_state(raw_state),
+      raw_state,
+      raw_state.tr(' ', '+')
+    ].compact.uniq
+  end
+
+  def decode_urlsafe_state(raw_state)
+    Base64.urlsafe_decode64(raw_state)
+  rescue ArgumentError
     nil
   end
 

@@ -43,6 +43,11 @@ variable "github_actions_repository" {
   default = "autonom-ia/chat"
 }
 
+variable "github_actions_extra_repositories" {
+  type    = list(string)
+  default = ["noktuaio/chat"]
+}
+
 variable "image_tag" {
   type    = string
   default = "autonomia-custom-image-port-ce"
