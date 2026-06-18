@@ -4,35 +4,34 @@ require 'base64'
 require 'digest'
 
 class Autonomia::AuthController < ApplicationController
+  STATE_PURPOSE = :autonomia_sso_state
+  STATE_TTL = 10.minutes
+
   skip_before_action :authenticate_user!, raise: false
 
   def start
     return redirect_to login_page_url(error: 'autonomia-sso-disabled') unless sso_enabled?
 
-    state = SecureRandom.urlsafe_base64(32)
     verifier = SecureRandom.urlsafe_base64(64)
-    session[:autonomia_sso] = {
-      state: state,
-      code_verifier: verifier,
-      return_to: permitted_return_to
-    }
+    state = encode_state(code_verifier: verifier, return_to: permitted_return_to)
 
     redirect_to authorization_url(state, verifier), allow_other_host: true
   end
 
   def callback
     return redirect_to login_page_url(error: 'autonomia-sso-error') if params[:error].present?
-    return redirect_to login_page_url(error: 'autonomia-sso-state') unless valid_state?
+
+    state = decode_state
+    return redirect_to login_page_url(error: 'autonomia-sso-state') if state.blank?
 
     token = Autonomia::Sso::Client.new.exchange_code!(
       code: params.require(:code),
       redirect_uri: callback_url,
-      code_verifier: sso_session[:code_verifier]
+      code_verifier: state[:code_verifier]
     )
     context = Autonomia::Sso::Client.new.fetch_context!(token.access_token)
     user = Autonomia::Sso::Provisioner.new(context: context).perform
 
-    session.delete(:autonomia_sso)
     redirect_to login_page_url(email: ERB::Util.url_encode(user.email), sso_auth_token: user.generate_sso_auth_token)
   rescue StandardError => e
     Rails.logger.error("[Autonomia SSO] #{e.class}: #{e.message}")
@@ -56,19 +55,34 @@ class Autonomia::AuthController < ApplicationController
     uri.to_s
   end
 
-  def valid_state?
-    expected_state = sso_session[:state].to_s
-    actual_state = params[:state].to_s
-    expected_state.present? && expected_state.bytesize == actual_state.bytesize &&
-      ActiveSupport::SecurityUtils.secure_compare(expected_state, actual_state)
+  def encode_state(code_verifier:, return_to:)
+    state_encryptor.encrypt_and_sign(
+      { code_verifier: code_verifier, return_to: return_to },
+      expires_in: STATE_TTL,
+      purpose: STATE_PURPOSE
+    )
+  end
+
+  def decode_state
+    state = state_encryptor.decrypt_and_verify(params[:state].to_s, purpose: STATE_PURPOSE)
+    return if state.blank?
+
+    state = state.with_indifferent_access
+    return if state[:code_verifier].blank?
+
+    state
+  rescue ActiveSupport::MessageEncryptor::InvalidMessage, ActiveSupport::MessageVerifier::InvalidSignature
+    nil
   end
 
   def pkce_challenge(verifier)
     Base64.urlsafe_encode64(Digest::SHA256.digest(verifier), padding: false)
   end
 
-  def sso_session
-    session[:autonomia_sso] || {}
+  def state_encryptor
+    key_len = ActiveSupport::MessageEncryptor.key_len
+    secret = Rails.application.key_generator.generate_key('autonomia-sso-state', key_len)
+    ActiveSupport::MessageEncryptor.new(secret, serializer: JSON)
   end
 
   def callback_url
