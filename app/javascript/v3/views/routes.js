@@ -23,6 +23,17 @@ export default [
     }),
   },
   {
+    path: frontendURL('login/local'),
+    name: 'local_login',
+    component: Login,
+    props: route => ({
+      localLogin: true,
+      config: route.query.config,
+      email: route.query.email,
+      authError: route.query.error,
+    }),
+  },
+  {
     path: frontendURL('login/sso'),
     name: 'sso_login',
     component: SamlLogin,

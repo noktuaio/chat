@@ -48,6 +48,7 @@ export default {
     ssoConversationId: { type: String, default: '' },
     email: { type: String, default: '' },
     authError: { type: String, default: '' },
+    localLogin: { type: Boolean, default: false },
   },
   setup() {
     const { replaceInstallationName } = useBranding();
@@ -74,6 +75,7 @@ export default {
       mfaToken: null,
       sessionsLimitReached: false,
       limitedSessions: [],
+      redirectingToAutonomia: false,
     };
   },
   validations() {
@@ -107,23 +109,36 @@ export default {
       return this.allowedLoginMethods.includes('saml');
     },
     showAutonomiaSso() {
-      return window.chatwootConfig.autonomiaSsoEnabled === 'true';
+      return (
+        !this.localLogin && window.chatwootConfig.autonomiaSsoEnabled === 'true'
+      );
     },
     autonomiaSsoUrl() {
       return window.chatwootConfig.autonomiaSsoUrl || '/auth/autonomia';
+    },
+    shouldAutoRedirectToAutonomia() {
+      return (
+        this.showAutonomiaSso &&
+        window.chatwootConfig.autonomiaSsoAutoRedirect === 'true' &&
+        !this.ssoAuthToken &&
+        !this.authError &&
+        !this.email
+      );
+    },
+    showSilentSsoLoader() {
+      return (
+        this.redirectingToAutonomia ||
+        Boolean(this.ssoAuthToken) ||
+        this.shouldAutoRedirectToAutonomia
+      );
     },
   },
   created() {
     if (this.ssoAuthToken) {
       this.submitLogin();
     }
-    if (
-      this.showAutonomiaSso &&
-      window.chatwootConfig.autonomiaSsoAutoRedirect === 'true' &&
-      !this.ssoAuthToken &&
-      !this.authError &&
-      !this.email
-    ) {
+    if (this.shouldAutoRedirectToAutonomia) {
+      this.redirectingToAutonomia = true;
       window.location.assign(this.autonomiaSsoUrl);
       return;
     }
@@ -306,6 +321,13 @@ export default {
 
 <template>
   <main
+    v-if="showSilentSsoLoader"
+    class="flex items-center justify-center w-full min-h-screen bg-n-brand/5 dark:bg-n-background"
+  >
+    <Spinner color-scheme="primary" size="" />
+  </main>
+  <main
+    v-else
     class="flex flex-col w-full min-h-screen py-20 bg-n-brand/5 dark:bg-n-background sm:px-6 lg:px-8"
   >
     <section class="max-w-5xl mx-auto">

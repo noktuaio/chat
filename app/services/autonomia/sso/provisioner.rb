@@ -7,6 +7,7 @@ class Autonomia::Sso::Provisioner
     ActiveRecord::Base.transaction do
       user = find_or_create_user
       account = find_or_create_account
+      sync_account_name(account)
       link_user(user)
       link_account(account)
       ensure_account_user(user, account)
@@ -42,6 +43,13 @@ class Autonomia::Sso::Provisioner
       locale: I18n.locale,
       custom_attributes: { 'onboarding_step' => 'account_details' }
     )
+  end
+
+  def sync_account_name(account)
+    return if organization_name.blank?
+    return if account.name == organization_name
+
+    account.update!(name: organization_name)
   end
 
   def link_user(user)

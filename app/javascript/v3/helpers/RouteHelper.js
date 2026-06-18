@@ -36,7 +36,7 @@ export const validateRouteAccess = (to, next, chatwootConfig = {}) => {
   // If the URL is an invalid path, redirect to login page
   // Disable navigation to signup page if signups are disabled
   // Signup route has an attribute (requireSignupEnabled) in it's definition
-  const isAnInalidSignupNavigation =
+  const isAnInvalidSignupNavigation =
     chatwootConfig.signupEnabled !== 'true' &&
     to.meta &&
     to.meta.requireSignupEnabled;
@@ -48,7 +48,7 @@ export const validateRouteAccess = (to, next, chatwootConfig = {}) => {
     to.meta &&
     to.meta.requireEnterprise;
 
-  if (!to.name || isAnInalidSignupNavigation || isEnterpriseOnlyPath) {
+  if (!to.name || isAnInvalidSignupNavigation || isEnterpriseOnlyPath) {
     next(frontendURL('login'));
     return;
   }

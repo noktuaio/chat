@@ -83,7 +83,12 @@ export const clearCookiesOnLogout = () => {
   clearLocalStorageOnLogout();
   clearSessionStorageOnLogout();
   const globalConfig = window.globalConfig || {};
-  const logoutRedirectLink = globalConfig.LOGOUT_REDIRECT_LINK || '/';
+  const chatwootConfig = window.chatwootConfig || {};
+  const logoutRedirectLink =
+    chatwootConfig.autonomiaSsoAutoRedirect === 'true' &&
+    chatwootConfig.autonomiaSsoLogoutUrl
+      ? chatwootConfig.autonomiaSsoLogoutUrl
+      : globalConfig.LOGOUT_REDIRECT_LINK || '/';
   window.location = logoutRedirectLink;
 };
 

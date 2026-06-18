@@ -31,6 +31,16 @@ RSpec.describe 'Autonomia::AuthController', type: :request do
       expect(params['state']).to be_present
       expect(params['state']).to match(/\A[A-Za-z0-9_-]+\z/)
     end
+
+    it 'passes prompt login to Autonomia Identity when requested' do
+      with_modified_env sso_env do
+        get '/auth/autonomia', params: { prompt: 'login' }
+      end
+
+      params = Rack::Utils.parse_query(URI.parse(response.location).query)
+
+      expect(params['prompt']).to eq('login')
+    end
   end
 
   describe 'GET /auth/autonomia/callback' do

@@ -51,6 +51,7 @@ class Autonomia::AuthController < ApplicationController
       state: state,
       code_challenge: pkce_challenge(verifier),
       code_challenge_method: 'S256',
+      prompt: permitted_prompt,
       return_to: permitted_return_to
     }.compact.to_query
     uri.to_s
@@ -112,6 +113,10 @@ class Autonomia::AuthController < ApplicationController
 
     value = params[:return_to].to_s
     value.start_with?('/app') ? value : nil
+  end
+
+  def permitted_prompt
+    params[:prompt].to_s == 'login' ? 'login' : nil
   end
 
   def login_page_url(error: nil, email: nil, sso_auth_token: nil)
