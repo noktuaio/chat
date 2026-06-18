@@ -42,7 +42,7 @@
         autonomiaSsoEnabled: '<%= ENV.fetch('AUTONOMIA_SSO_ENABLED', false) %>',
         autonomiaSsoAutoRedirect: '<%= ENV.fetch('AUTONOMIA_SSO_AUTO_REDIRECT', false) %>',
         autonomiaSsoUrl: '<%= ENV.fetch('AUTONOMIA_SSO_URL', '/auth/autonomia') %>',
-        autonomiaSsoLogoutUrl: '<%= ENV.fetch('AUTONOMIA_SSO_LOGOUT_URL', 'https://auth.autonomia.site/login/') %>',
+        autonomiaSsoLogoutUrl: '<%= ENV.fetch('AUTONOMIA_SSO_LOGOUT_URL', 'https://auth.autonomia.site/logout?client_id=talkai&post_logout_redirect_uri=https%3A%2F%2Fagents.autonomia.site%2Fauth%2Fautonomia%3Fprompt%3Dlogin') %>',
         allowedLoginMethods: <%= @global_config['ALLOWED_LOGIN_METHODS'].to_json.html_safe %>,
         fbApiVersion: '<%= @global_config['FACEBOOK_API_VERSION'] %>',
         whatsappAppId: '<%= @global_config['WHATSAPP_APP_ID'] %>',
