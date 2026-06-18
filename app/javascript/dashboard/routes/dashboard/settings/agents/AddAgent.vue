@@ -101,7 +101,11 @@ const addAgent = async () => {
     }
 
     const newAgent = await store.dispatch('agents/create', payload);
-    useAlert(t('AGENT_MGMT.ADD.API.SUCCESS_MESSAGE'));
+    useAlert(
+      newAgent?.pending_invitation
+        ? t('AGENT_MGMT.ADD.API.INVITATION_SENT')
+        : t('AGENT_MGMT.ADD.API.SUCCESS_MESSAGE')
+    );
     if (showSlaSchedule.value && defineSchedule.value && newAgent?.id) {
       createdAgent.value = newAgent;
       showScheduleEditor.value = true;

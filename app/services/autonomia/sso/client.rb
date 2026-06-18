@@ -4,7 +4,7 @@ require 'net/http'
 require 'uri'
 
 class Autonomia::Sso::Client
-  Token = Struct.new(:access_token, :id_token, :refresh_token, keyword_init: true) do
+  Token = Struct.new(:access_token, :id_token, :refresh_token, :expires_in, keyword_init: true) do
     def context_token
       id_token.presence || access_token
     end
@@ -21,7 +21,8 @@ class Autonomia::Sso::Client
     Token.new(
       access_token: response.fetch('access_token'),
       id_token: response['id_token'],
-      refresh_token: response['refresh_token']
+      refresh_token: response['refresh_token'],
+      expires_in: response['expires_in']
     )
   end
 

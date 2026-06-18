@@ -31,7 +31,7 @@ class Autonomia::AuthController < ApplicationController
       code_verifier: state[:code_verifier]
     )
     context = client.fetch_context!(token.context_token)
-    user = Autonomia::Sso::Provisioner.new(context: context).perform
+    user = Autonomia::Sso::Provisioner.new(context: context, token: token).perform
 
     redirect_to login_page_url(email: ERB::Util.url_encode(user.email), sso_auth_token: user.generate_sso_auth_token)
   rescue StandardError => e

@@ -55,7 +55,9 @@ export const actions = {
     commit(types.default.SET_AGENT_CREATING_STATUS, true);
     try {
       const response = await AgentAPI.create(agentInfo);
-      commit(types.default.ADD_AGENT, response.data);
+      if (!response.data.pending_invitation) {
+        commit(types.default.ADD_AGENT, response.data);
+      }
       commit(types.default.SET_AGENT_CREATING_STATUS, false);
       return response.data;
     } catch (error) {

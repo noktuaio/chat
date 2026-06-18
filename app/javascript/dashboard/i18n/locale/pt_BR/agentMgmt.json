@@ -44,6 +44,7 @@
       },
       "API": {
         "SUCCESS_MESSAGE": "Agente adicionado com sucesso",
+        "INVITATION_SENT": "Convite enviado com sucesso. O agente acessará a plataforma após aceitar o convite e fazer login.",
         "EXIST_MESSAGE": "O E-mail do informado já está uso, por favor tente outro endereço de e-mail",
         "ERROR_MESSAGE": "Não foi possível conectar ao servidor Woot, por favor tente novamente mais tarde"
       }

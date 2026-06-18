@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Autonomia::Sso::Provisioner
-  pattr_initialize [:context!]
+  pattr_initialize [:context!, { token: nil }]
 
   def perform
     ActiveRecord::Base.transaction do
@@ -56,8 +56,9 @@ class Autonomia::Sso::Provisioner
     Autonomia::UserLink.find_or_initialize_by(identity_user_id: identity_user_id).tap do |link|
       link.user = user
       link.email = identity_email
-      link.metadata = { 'identity_user' => identity_user }
+      link.metadata = (link.metadata || {}).merge('identity_user' => identity_user)
       link.save!
+      Autonomia::Sso::TokenStore.write!(link, token) if token.present?
     end
   end
 
@@ -71,9 +72,31 @@ class Autonomia::Sso::Provisioner
 
   def ensure_account_user(user, account)
     AccountUser.find_or_initialize_by(user: user, account: account).tap do |account_user|
-      account_user.role = 'administrator'
+      pending_invitation = pending_agent_invitation(account)
+      account_user.role = pending_invitation&.fetch('role', nil).presence || 'administrator'
+      account_user.custom_role_id = pending_invitation['custom_role_id'] if pending_invitation&.fetch('custom_role_id', nil).present?
+      account_user.inviter_id ||= pending_invitation['invited_by_user_id'] if pending_invitation.present?
       account_user.save!
+      consume_pending_agent_invitation(account) if pending_invitation.present?
     end
+  end
+
+  def pending_agent_invitation(account)
+    pending_agent_invitations(account)[identity_email.downcase]
+  end
+
+  def consume_pending_agent_invitation(account)
+    invitations = pending_agent_invitations(account)
+    invitations.delete(identity_email.downcase)
+    account.update!(
+      custom_attributes: (account.custom_attributes || {}).merge(
+        'autonomia_pending_agent_invitations' => invitations
+      )
+    )
+  end
+
+  def pending_agent_invitations(account)
+    (account.custom_attributes || {}).fetch('autonomia_pending_agent_invitations', {})
   end
 
   def linked_user
