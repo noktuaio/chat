@@ -40,7 +40,7 @@ const agentNotFinalized = computed(
 
 // The test conversation is volatile (cleared on tab switch). Persist it in
 // sessionStorage per agent so switching panels and back doesn't wipe the chat.
-const storageKey = `autonomia_test_${props.agentId}`;
+const storageKey = `autonomia_test_v2_${props.agentId}`;
 const restoreMessages = () => {
   try {
     const raw = sessionStorage.getItem(storageKey);
