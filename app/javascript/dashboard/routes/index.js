@@ -6,9 +6,23 @@ import store from 'dashboard/store';
 import { validateLoggedInRoutes } from '../helper/routeHelpers';
 import { isOnOnboardingView } from 'v3/helpers/RouteHelper';
 import AnalyticsHelper from '../helper/AnalyticsHelper';
+import AcceptInvitation from 'v3/views/auth/accept-invitation/Index.vue';
 
 const ONBOARDING_STEPS = ['account_details', 'enrichment'];
-const routes = [...dashboard.routes];
+const publicRoutes = [
+  {
+    path: '/accept-invitation',
+    name: 'accept_invitation',
+    component: AcceptInvitation,
+    meta: { ignoreSession: true },
+    props: route => ({
+      token: route.query.token,
+      clientId: route.query.client_id,
+    }),
+  },
+];
+
+const routes = [...publicRoutes, ...dashboard.routes];
 
 export const router = createRouter({ history: createWebHistory(), routes });
 
@@ -27,6 +41,10 @@ const defaultAuthenticatedRoute = user => {
 };
 
 export const validateAuthenticateRoutePermission = async (to, next) => {
+  if (to.meta?.ignoreSession) {
+    return next();
+  }
+
   const { isLoggedIn, getCurrentUser: user } = store.getters;
   const ssoCredentials = getSsoCredentials(to);
 

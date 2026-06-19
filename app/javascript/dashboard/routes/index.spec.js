@@ -26,6 +26,23 @@ describe('#validateAuthenticateRoutePermission', () => {
   });
 
   describe('when user is not logged in', () => {
+    it('should allow public routes that ignore session', async () => {
+      const to = {
+        name: 'accept_invitation',
+        meta: { ignoreSession: true },
+        query: {
+          client_id: 'talkai',
+          token: 'invitation-token',
+        },
+      };
+
+      store.getters.isLoggedIn = false;
+
+      await validateAuthenticateRoutePermission(to, next);
+
+      expect(next).toHaveBeenCalledWith();
+    });
+
     it('should redirect to login', () => {
       const to = { name: 'some-protected-route', params: { accountId: 1 } };
 
