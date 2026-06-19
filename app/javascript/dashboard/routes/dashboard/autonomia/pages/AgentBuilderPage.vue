@@ -65,6 +65,7 @@ const phase = useMapGetter('autonomiaBuildThreads/getPhase');
 const buildError = useMapGetter('autonomiaBuildThreads/getError');
 const generatedAgent = useMapGetter('autonomiaBuildThreads/getAgent');
 const uiFlags = useMapGetter('autonomiaBuildThreads/getUIFlags');
+const agentFlags = useMapGetter('autonomiaAgents/getUIFlags');
 
 const eligibleInboxes = useMapGetter('autonomiaChannels/getEligible');
 const channelFlags = useMapGetter('autonomiaChannels/getUIFlags');
@@ -75,6 +76,9 @@ const sourceFlags = useMapGetter('autonomiaSources/getUIFlags');
 // alongside the conversation in the conversa step.
 const wizardStep = ref('conversa');
 const isSavingGreeting = ref(false);
+const isActivatingAgent = computed(
+  () => !!agentFlags.value?.updatingItem || !!channelFlags.value?.connecting
+);
 
 // Step headings, focused on each transition for keyboard/screen-reader users.
 const conversaHeadingRef = ref(null);
@@ -321,6 +325,11 @@ const testAgent = () => {
 const connectInbox = async inboxId => {
   if (!agentId.value || !inboxId) return;
   try {
+    await store.dispatch('autonomiaAgents/update', {
+      id: agentId.value,
+      enabled: true,
+      status: 'active',
+    });
     await store.dispatch('autonomiaChannels/connect', {
       agentId: agentId.value,
       inboxId,
@@ -617,7 +626,7 @@ onBeforeUnmount(() => {
             :approved-count="approvedCount"
             :confidence-pct="confidencePct"
             :is-saving-greeting="isSavingGreeting"
-            :is-connecting="channelFlags?.connecting"
+            :is-connecting="isActivatingAgent"
             @save-greeting="saveGreeting"
             @test="testAgent"
             @connect="connectInbox"
