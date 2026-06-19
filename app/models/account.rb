@@ -57,6 +57,7 @@ class Account < ApplicationRecord
   store_accessor :settings, :captain_auto_resolve_mode
   include AccountCaptainAutoResolve
 
+  has_many :autonomia_account_links, class_name: 'Autonomia::AccountLink', dependent: :destroy
   has_many :account_users, dependent: :destroy_async
   has_many :agent_bot_inboxes, dependent: :destroy_async
   has_many :agent_bots, dependent: :destroy_async

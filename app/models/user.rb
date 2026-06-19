@@ -84,6 +84,7 @@ class User < ApplicationRecord
   encrypts :otp_secret, deterministic: true
   encrypts :otp_backup_codes
 
+  has_many :autonomia_user_links, class_name: 'Autonomia::UserLink', dependent: :destroy
   has_many :account_users, dependent: :destroy_async
   has_many :accounts, through: :account_users
   accepts_nested_attributes_for :account_users

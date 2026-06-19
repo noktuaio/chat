@@ -17,6 +17,7 @@ RSpec.describe Account do
   it { is_expected.to have_many(:portals).dependent(:destroy_async) }
   it { is_expected.to have_many(:categories).dependent(:destroy_async) }
   it { is_expected.to have_many(:teams).dependent(:destroy_async) }
+  it { is_expected.to have_many(:autonomia_account_links).class_name('Autonomia::AccountLink').dependent(:destroy) }
 
   # This validation happens in ApplicationRecord
   describe 'length validations' do
