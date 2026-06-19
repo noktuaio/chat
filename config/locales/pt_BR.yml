@@ -557,3 +557,11 @@ pt_BR:
       no_subscriptions_to_test: 'Selecione pelo menos uma assinatura para teste.'
       no_subscriptions_to_delete: 'Selecione pelo menos uma assinatura para excluir.'
       subscriptions_deleted: "Excluída(s) %{count} inscrição(ões). O(s) dispositivo(s) do usuário será(ão) registrado(s) novamente na próxima inicialização do aplicativo."
+  autonomia:
+    agents:
+      operate:
+        handoff_default: 'Não quero te passar uma informação imprecisa. Vou encaminhar seu atendimento para alguém do nosso time continuar com você.'
+        handoff_defaults:
+          - 'Não quero te passar uma informação imprecisa. Vou encaminhar seu atendimento para alguém do nosso time continuar com você.'
+          - 'Essa resposta precisa de uma conferência do nosso time. Vou direcionar seu atendimento para um humano seguir com você.'
+          - 'Para manter a resposta segura, vou trazer alguém do nosso time para continuar por aqui.'

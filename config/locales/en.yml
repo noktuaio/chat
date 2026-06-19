@@ -409,6 +409,10 @@ en:
     agents:
       operate:
         handoff_default: "Thanks for reaching out! I'm connecting you with a member of our team who will continue from here."
+        handoff_defaults:
+          - "I don't want to give you an imprecise answer, so I'm sending this to our team to continue with you."
+          - "This needs a quick check from our team. I'm handing the conversation over so they can help you properly."
+          - "To keep the answer accurate, I'll bring someone from our team into the conversation."
         connect_errors:
           generic: 'Unable to connect this inbox to the agent.'
           agent_not_active: 'Enable and activate the agent before connecting an inbox.'

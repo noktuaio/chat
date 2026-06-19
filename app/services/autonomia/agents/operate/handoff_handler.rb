@@ -116,11 +116,26 @@ module Autonomia
           ).perform
         end
 
-        # Mensagem graciosa: fallback_message do agente quando configurada, senão o default
-        # do I18n. Nunca expõe instruction/scaffold nem o motivo bruto do LLM.
+        # Mensagem graciosa: prefere a frase contextual gerada pelo Answerer. Se a IA falhou
+        # ou o gate bloqueou a reply por segurança, usa uma variação curta de encaminhamento.
+        # Nunca expõe instruction/scaffold nem o motivo bruto do LLM.
         def handoff_text
-          @agent.fallback_message.presence ||
-            I18n.t('autonomia.agents.operate.handoff_default')
+          @result&.reply.to_s.strip.presence || default_handoff_text
+        end
+
+        def default_handoff_text
+          messages = Array(I18n.t('autonomia.agents.operate.handoff_defaults',
+                                  default: [I18n.t('autonomia.agents.operate.handoff_default')]))
+          messages.compact_blank[handoff_variant_index % messages.compact_blank.size]
+        end
+
+        def handoff_variant_index
+          seed = [
+            @conversation.id,
+            @conversation.messages.incoming.reorder(id: :desc).limit(1).pick(:id),
+            Time.current.to_date.to_s
+          ].compact.join(':')
+          seed.each_byte.sum
         end
 
         # Fase D — reatribuição real ao humano (ADITIVO). HandoffAssigner resolve o alvo

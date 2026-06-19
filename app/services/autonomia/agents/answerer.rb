@@ -221,13 +221,23 @@ module Autonomia
       # Encaminhou ao humano, logo nenhuma resposta foi entregue a partir da base.
       def handoff_result(parsed, confidence, used)
         AnswerResult.new(
-          reply: @agent.fallback_message.presence,
+          reply: handoff_reply(parsed),
           confidence: confidence,
           handoff: { should: true, reason: parsed['handoff_reason'].presence || 'low_confidence' },
           used_knowledge: used, answered_from_knowledge: false,
           raw_reply: parsed['reply'], # melhor esforço preservado p/ o Copilot
           debug_prompt: @debug_prompt
         )
+      end
+
+      def handoff_reply(parsed)
+        reply = parsed['reply'].to_s.strip
+        return if reply.blank?
+
+        # Quando o próprio modelo pediu handoff, ou quando a resposta é uma recusa de "não sei",
+        # a frase gerada é segura e tende a variar por contexto. Nos demais gates determinísticos
+        # (ex.: resposta específica demais sem base forte), não entregamos a resposta bloqueada.
+        return sanitize_grounding_phrase(reply, [], false) if parsed['should_handoff'] == true || refusal_no_info?(parsed)
       end
 
       # used_snippet_ids ∩ ids dos snippets -> { id, content, source: label } (conteúdo do usuário, ok expor).
@@ -267,7 +277,7 @@ module Autonomia
       # Handoff seguro quando a IA está indisponível: nunca crash, nunca eco do prompt.
       def safe_handoff
         AnswerResult.new(
-          reply: @agent.fallback_message.presence,
+          reply: nil,
           confidence: 0.0,
           handoff: { should: true, reason: 'ai_unavailable' },
           used_knowledge: [], answered_from_knowledge: false,

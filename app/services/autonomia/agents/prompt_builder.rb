@@ -128,7 +128,7 @@ module Autonomia
       def fallback_block
         return if @agent.fallback_message.blank?
 
-        "# Mensagem de fallback configurada\n#{@agent.fallback_message}"
+        "# Orientação de encaminhamento\nUse esta mensagem apenas como referência de intenção e tom; NÃO a repita literalmente em todos os handoffs.\n#{@agent.fallback_message}"
       end
 
       # Últimos HISTORY_MAX_TURNS pares (user/assistant) -> mensagens normalizadas.

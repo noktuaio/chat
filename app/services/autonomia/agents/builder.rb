@@ -136,8 +136,10 @@ module Autonomia
         `name` (perguntado), `agent_type` (deduzido), `instruction` (oculta, §7), `scaffold` (andaime oculto), `human_card`
         (resumo simples 1–2 frases, único texto visível sobre o miolo), `greeting`, `fallback_message`, `handoff_rule`,
         `starter_questions` (ancoradas no conhecimento real), `tone`, `guardrails`.
-        - `greeting`/`fallback_message`: grave SÓ o conteúdo final, em primeira pessoa do agente, usável como está. NUNCA
-          inclua dentro do valor o prefixo "Aqui vai uma sugestão, ajuste como quiser": isso é rótulo de UI, não texto do agente.
+        - `greeting`: grave SÓ o conteúdo final, em primeira pessoa do agente, usável como está. NUNCA inclua dentro do
+          valor o prefixo "Aqui vai uma sugestão, ajuste como quiser": isso é rótulo de UI, não texto do agente.
+        - `fallback_message`: grave uma orientação curta de encaminhamento, NÃO um texto longo e fixo para repetir sempre.
+          Evite horários, promessas e frases robóticas; o runtime deve preferir uma resposta contextual do modelo.
         - `guardrails`: lista curta, SEM repetir as regras já escritas em §7 (uma fonte da verdade por regra).
 
         ## 9. QUALIDADE E VERACIDADE
