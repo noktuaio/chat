@@ -47,11 +47,16 @@ const TONE_OPTIONS = computed(() =>
 );
 
 const HANDOFF_OPTIONS = computed(() =>
-  ['low_confidence', 'always_ask', 'never'].map(value => ({
+  ['none', 'inbox_member'].map(value => ({
     value,
     label: t(`AGENTS.TUNE.HANDOFF_OPTIONS.${value.toUpperCase()}`),
   }))
 );
+
+const VALID_HANDOFF_STRATEGIES = new Set(['none', 'inbox_member']);
+
+const normalizeHandoffStrategy = value =>
+  VALID_HANDOFF_STRATEGIES.has(value) ? value : 'none';
 
 // handoff_strategy/confidence_threshold are jsonb `config` store-accessors on
 // the backend — read them from agent.config, never the top level.
@@ -59,7 +64,9 @@ const form = reactive({
   greeting: props.agent.greeting || '',
   fallback_message: props.agent.fallback_message || '',
   tone: props.agent.tone || 'friendly',
-  handoff_strategy: props.agent.config?.handoff_strategy || 'low_confidence',
+  handoff_strategy: normalizeHandoffStrategy(
+    props.agent.config?.handoff_strategy
+  ),
   confidence_threshold:
     props.agent.config?.confidence_threshold != null
       ? props.agent.config.confidence_threshold
@@ -73,7 +80,9 @@ watch(
     form.greeting = agent.greeting || '';
     form.fallback_message = agent.fallback_message || '';
     form.tone = agent.tone || 'friendly';
-    form.handoff_strategy = agent.config?.handoff_strategy || 'low_confidence';
+    form.handoff_strategy = normalizeHandoffStrategy(
+      agent.config?.handoff_strategy
+    );
     form.confidence_threshold =
       agent.config?.confidence_threshold != null
         ? agent.config.confidence_threshold
@@ -321,6 +330,9 @@ watch(builderPhase, phase => {
           :options="HANDOFF_OPTIONS"
           class="w-full"
         />
+        <p class="text-xs leading-relaxed text-n-slate-10">
+          {{ t('AGENTS.TUNE.HANDOFF_HINT') }}
+        </p>
       </div>
 
       <div class="flex flex-col gap-1">

@@ -297,10 +297,10 @@
         "PLAYFUL": "Descontraído"
       },
       "HANDOFF_STRATEGY": "Transferir para um humano",
+      "HANDOFF_HINT": "Use “Membro da caixa de entrada” para atribuir automaticamente a um atendente vinculado ao canal quando o agente encaminhar a conversa.",
       "HANDOFF_OPTIONS": {
-        "LOW_CONFIDENCE": "Quando estiver em dúvida",
-        "ALWAYS_ASK": "Sempre oferecer um humano",
-        "NEVER": "Nunca"
+        "NONE": "Não atribuir automaticamente",
+        "INBOX_MEMBER": "Membro da caixa de entrada"
       },
       "CONFIDENCE_THRESHOLD": "Limite de confiança",
       "SAVE": "Salvar alterações",

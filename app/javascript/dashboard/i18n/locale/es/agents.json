@@ -259,10 +259,10 @@
         "PLAYFUL": "Desenfadado"
       },
       "HANDOFF_STRATEGY": "Transferir a una persona",
+      "HANDOFF_HINT": "Usa “Miembro de la bandeja” para asignar automáticamente la conversación a una persona conectada al canal cuando el agente la transfiera.",
       "HANDOFF_OPTIONS": {
-        "LOW_CONFIDENCE": "Cuando haya dudas",
-        "ALWAYS_ASK": "Ofrecer siempre una persona",
-        "NEVER": "Nunca"
+        "NONE": "No asignar automáticamente",
+        "INBOX_MEMBER": "Miembro de la bandeja"
       },
       "CONFIDENCE_THRESHOLD": "Umbral de confianza",
       "SAVE": "Guardar cambios",

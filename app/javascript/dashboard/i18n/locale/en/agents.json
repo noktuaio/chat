@@ -297,10 +297,10 @@
         "PLAYFUL": "Playful"
       },
       "HANDOFF_STRATEGY": "Hand off to a human",
+      "HANDOFF_HINT": "Use “Inbox member” to automatically assign the conversation to a teammate connected to the channel when the agent hands it off.",
       "HANDOFF_OPTIONS": {
-        "LOW_CONFIDENCE": "When unsure",
-        "ALWAYS_ASK": "Always offer a human",
-        "NEVER": "Never"
+        "NONE": "Do not auto-assign",
+        "INBOX_MEMBER": "Inbox member"
       },
       "CONFIDENCE_THRESHOLD": "Confidence threshold",
       "SAVE": "Save changes",
