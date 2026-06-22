@@ -50,12 +50,12 @@ variable "github_actions_extra_repositories" {
 
 variable "image_tag" {
   type    = string
-  default = "autonomia-custom-image-port-ce"
+  default = "autonomia-custom-image-port-ee"
 }
 
 variable "cw_edition" {
   type    = string
-  default = "ce"
+  default = "ee"
 }
 
 variable "enable_account_signup" {
