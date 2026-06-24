@@ -8,9 +8,9 @@ const globalConfig = useMapGetter('globalConfig/get');
 
 <template>
   <img
-    v-if="globalConfig.logoThumbnail"
+    v-if="globalConfig.menuIcon || globalConfig.logoThumbnail"
     v-bind="attrs"
-    :src="globalConfig.logoThumbnail"
+    :src="globalConfig.menuIcon || globalConfig.logoThumbnail"
   />
   <svg
     v-else
