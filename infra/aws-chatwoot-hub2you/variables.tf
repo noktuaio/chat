@@ -20,7 +20,7 @@ variable "environment" {
 
 variable "domain_name" {
   type    = string
-  default = "agents-hub2you.autonomia.site"
+  default = "chat.hub2you.ai"
 }
 
 variable "certificate_arn" {
@@ -168,7 +168,7 @@ variable "autonomia_auth_context_endpoint" {
 
 variable "autonomia_auth_client_id" {
   type    = string
-  default = "talkai"
+  default = "chat2you"
 }
 
 variable "email_campaign_enabled" {

@@ -36,6 +36,7 @@ AUTONOMIA_SSO_AUTO_REDIRECT=${tostring(var.autonomia_sso_auto_redirect)}
 AUTONOMIA_SSO_ENABLED=${tostring(var.autonomia_sso_enabled)}
 AUTONOMIA_SSO_URL=/auth/autonomia
 AWS_REGION=${var.aws_region}
+BRAND_NAME=Chat2You
 CAMPAIGN_IMPORT_ENABLED=${tostring(var.campaign_import_enabled)}
 CHATWOOT_BASE_URL=https://${var.domain_name}
 CRM_AI_ENABLED=${tostring(var.crm_ai_enabled)}
@@ -50,11 +51,14 @@ EMAIL_CAMPAIGN_ENABLED=${tostring(var.email_campaign_enabled)}
 ENABLE_ACCOUNT_SIGNUP=${tostring(var.enable_account_signup)}
 FORCE_SSL=false
 FRONTEND_URL=https://${var.domain_name}
+INSTALLATION_NAME=Chat2You
 INSTALLATION_PRICING_PLAN=enterprise
 INSTALLATION_PRICING_PLAN_QUANTITY=999
 INSTALLATION_ENV=aws-ec2
+LOGO_THUMBNAIL=/brand-assets/hub2you-icon.png
 LOG_LEVEL=info
 MAILER_SENDER_EMAIL=${var.mailer_sender_email}
+MENU_ICON=/brand-assets/hub2you-icon.png
 POSTGRES_DATABASE=${aws_db_instance.chatwoot.db_name}
 POSTGRES_HOST=${aws_db_instance.chatwoot.address}
 POSTGRES_PASSWORD=${random_password.db.result}
@@ -244,6 +248,10 @@ resource "aws_instance" "chatwoot" {
 
   tags = {
     Name = "${local.name}-ec2"
+  }
+
+  lifecycle {
+    ignore_changes = [ami, user_data]
   }
 }
 

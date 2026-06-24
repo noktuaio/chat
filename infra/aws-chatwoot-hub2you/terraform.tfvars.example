@@ -2,10 +2,12 @@ aws_profile = "hub2you"
 aws_region  = "us-east-1"
 
 # Trocar pela URL definitiva antes do apply.
-domain_name = "agents-hub2you.autonomia.site"
+domain_name = "chat.hub2you.ai"
 
 # Emitir/importar um certificado ACM nesta conta/regiao para o domain_name acima.
 certificate_arn = "arn:aws:acm:us-east-1:354307071110:certificate/REPLACE_ME"
+
+autonomia_auth_client_id = "chat2you"
 
 # VPC default existente na conta hub2you. Nao criar VPC/subnets novas para este MVP.
 existing_vpc_id = "vpc-0dc630d9b0d30e44e"

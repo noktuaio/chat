@@ -127,7 +127,7 @@ jobs:
             location=$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\r')
 
             if [ -n "$location" ] \
-              && printf '%s\n' "$location" | grep -F 'client_id=talkai' \
+              && printf '%s\n' "$location" | grep -F 'client_id=chat2you' \
               && printf '%s\n' "$location" | grep -F "redirect_uri=https%3A%2F%2F${{ inputs.domain_name }}%2Fauth%2Fautonomia%2Fcallback"; then
               echo "$location"
               exit 0

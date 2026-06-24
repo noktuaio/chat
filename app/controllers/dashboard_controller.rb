@@ -5,6 +5,7 @@ class DashboardController < ActionController::Base
     LOGO
     LOGO_DARK
     LOGO_THUMBNAIL
+    MENU_ICON
     INSTALLATION_NAME
     WIDGET_BRAND_URL
     TERMS_URL
