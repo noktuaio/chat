@@ -904,6 +904,8 @@
       "STAGE_NAME_PLACEHOLDER": "Ex.: Qualificação",
       "PROBABILITY": "%",
       "WIP": "Limite",
+      "MOVE_STAGE_UP": "Subir etapa",
+      "MOVE_STAGE_DOWN": "Descer etapa",
       "DELETE_STAGE": "Excluir etapa",
       "INBOX_AUTOMATION": "Inbox e automação",
       "INBOX_AUTOMATION_HELP": "Vincule inboxes que devem alimentar este funil. Com auto-criação ativa, novas mensagens criam ou atualizam cards na etapa escolhida.",

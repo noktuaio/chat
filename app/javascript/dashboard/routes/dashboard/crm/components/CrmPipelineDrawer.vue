@@ -175,6 +175,16 @@ const removeStage = index => {
   form.stages.splice(index, 1);
 };
 
+const moveStage = (fromIndex, direction) => {
+  const toIndex = fromIndex + direction;
+  if (toIndex < 0 || toIndex >= form.stages.length) return;
+
+  const stages = [...form.stages];
+  const [stage] = stages.splice(fromIndex, 1);
+  stages.splice(toIndex, 0, stage);
+  form.stages = stages;
+};
+
 const toggleStageAutomations = stage => {
   if (!stage.id) return;
   expandedAutomationStages.value = {
@@ -420,6 +430,24 @@ useKeyboardEvents({
                   :label="t('CRM_KANBAN.PIPELINE_DRAWER.WIP')"
                 />
                 <div class="flex items-end justify-end gap-1">
+                  <Button
+                    icon="i-lucide-arrow-up"
+                    slate
+                    ghost
+                    sm
+                    :title="t('CRM_KANBAN.PIPELINE_DRAWER.MOVE_STAGE_UP')"
+                    :disabled="index === 0"
+                    @click="moveStage(index, -1)"
+                  />
+                  <Button
+                    icon="i-lucide-arrow-down"
+                    slate
+                    ghost
+                    sm
+                    :title="t('CRM_KANBAN.PIPELINE_DRAWER.MOVE_STAGE_DOWN')"
+                    :disabled="index === form.stages.length - 1"
+                    @click="moveStage(index, 1)"
+                  />
                   <Button
                     v-if="isEditing && stage.id"
                     icon="i-lucide-workflow"

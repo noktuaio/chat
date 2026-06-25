@@ -904,6 +904,8 @@
       "STAGE_NAME_PLACEHOLDER": "E.g. Qualification",
       "PROBABILITY": "%",
       "WIP": "Limit",
+      "MOVE_STAGE_UP": "Move stage up",
+      "MOVE_STAGE_DOWN": "Move stage down",
       "DELETE_STAGE": "Delete stage",
       "INBOX_AUTOMATION": "Inbox and automation",
       "INBOX_AUTOMATION_HELP": "Link inboxes that should feed this pipeline. When auto-create is on, new messages create or update cards in the selected entry stage.",
