@@ -14,6 +14,22 @@ describe ChatwootHub do
     expect(described_class.installation_identifier).to eq installation_identifier
   end
 
+  describe '.pricing_plan_quantity' do
+    before do
+      allow(ChatwootApp).to receive(:enterprise?).and_return(true)
+    end
+
+    it 'returns the installation config value as an integer' do
+      create(:installation_config, name: 'INSTALLATION_PRICING_PLAN_QUANTITY', value: '999')
+
+      expect(described_class.pricing_plan_quantity).to eq(999)
+    end
+
+    it 'returns zero when the installation config is not present' do
+      expect(described_class.pricing_plan_quantity).to eq(0)
+    end
+  end
+
   context 'when fetching sync_with_hub' do
     it 'get latest version from chatwoot hub' do
       version = '1.1.1'
