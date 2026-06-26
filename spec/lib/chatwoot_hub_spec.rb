@@ -17,6 +17,7 @@ describe ChatwootHub do
   describe '.pricing_plan_quantity' do
     before do
       allow(ChatwootApp).to receive(:enterprise?).and_return(true)
+      allow(ChatwootApp).to receive(:self_hosted_enterprise_configured?).and_return(false)
     end
 
     it 'returns the installation config value as an integer' do
@@ -27,6 +28,34 @@ describe ChatwootHub do
 
     it 'returns zero when the installation config is not present' do
       expect(described_class.pricing_plan_quantity).to eq(0)
+    end
+
+    it 'uses the self-hosted enterprise environment quantity when configured' do
+      allow(ChatwootApp).to receive(:self_hosted_enterprise_configured?).and_return(true)
+
+      with_modified_env INSTALLATION_PRICING_PLAN_QUANTITY: '10000' do
+        expect(described_class.pricing_plan_quantity).to eq(10_000)
+      end
+    end
+  end
+
+  describe '.pricing_plan' do
+    before do
+      allow(ChatwootApp).to receive(:enterprise?).and_return(true)
+      allow(ChatwootApp).to receive(:self_hosted_enterprise_configured?).and_return(false)
+    end
+
+    it 'returns the installation config value' do
+      create(:installation_config, name: 'INSTALLATION_PRICING_PLAN', value: 'premium')
+
+      expect(described_class.pricing_plan).to eq('premium')
+    end
+
+    it 'uses the self-hosted enterprise environment plan when configured' do
+      create(:installation_config, name: 'INSTALLATION_PRICING_PLAN', value: 'community')
+      allow(ChatwootApp).to receive(:self_hosted_enterprise_configured?).and_return(true)
+
+      expect(described_class.pricing_plan).to eq('enterprise')
     end
   end
 
