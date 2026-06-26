@@ -10,8 +10,17 @@ module Enterprise::Internal::CheckNewVersionsJob
   def update_plan_info
     return if @instance_info.blank?
 
-    update_installation_config(key: 'INSTALLATION_PRICING_PLAN', value: @instance_info['plan'])
-    update_installation_config(key: 'INSTALLATION_PRICING_PLAN_QUANTITY', value: @instance_info['plan_quantity'])
+    if ChatwootApp.self_hosted_enterprise_configured?
+      update_installation_config(key: 'INSTALLATION_PRICING_PLAN', value: 'enterprise')
+      update_installation_config(
+        key: 'INSTALLATION_PRICING_PLAN_QUANTITY',
+        value: ENV.fetch('INSTALLATION_PRICING_PLAN_QUANTITY', 10_000).to_i
+      )
+    else
+      update_installation_config(key: 'INSTALLATION_PRICING_PLAN', value: @instance_info['plan'])
+      update_installation_config(key: 'INSTALLATION_PRICING_PLAN_QUANTITY', value: @instance_info['plan_quantity'])
+    end
+
     update_installation_config(key: 'CHATWOOT_SUPPORT_WEBSITE_TOKEN', value: @instance_info['chatwoot_support_website_token'])
     update_installation_config(key: 'CHATWOOT_SUPPORT_IDENTIFIER_HASH', value: @instance_info['chatwoot_support_identifier_hash'])
     update_installation_config(key: 'CHATWOOT_SUPPORT_SCRIPT_URL', value: @instance_info['chatwoot_support_script_url'])
