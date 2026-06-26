@@ -20,8 +20,12 @@ module Crm
         steer = instructions.to_s.strip
         params[:instructions] = steer if steer.present?
 
+        started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         data = client.audio.speech(parameters: params)
         data.presence
+      rescue StandardError => e
+        log_failure(e, voice: voice, started_at: started_at)
+        raise
       end
 
       private
@@ -38,6 +42,22 @@ module Crm
         ::Crm::Ai::ApiBaseGuard.validate!(base)
       rescue ::Crm::Ai::ApiBaseGuard::BlockedError
         raise Error, 'invalid_api_base'
+      end
+
+      def log_failure(error, voice:, started_at:)
+        latency = started_at ? ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round : nil
+        Rails.logger.error(
+          "[crm][ai][openai_error] operation=audio.speech model=#{Config::TTS_MODEL} " \
+          "error_type=#{error.class.name} credential_source=#{@credential[:source]} api_host=#{api_host} " \
+          "voice=#{voice} latency_ms=#{latency} message=#{error.message.to_s.truncate(300)}"
+        )
+      end
+
+      def api_host
+        base = @credential[:api_base].to_s.strip.presence || 'https://api.openai.com'
+        URI.parse(base).host
+      rescue StandardError
+        nil
       end
     end
   end

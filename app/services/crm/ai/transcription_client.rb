@@ -17,6 +17,7 @@ module Crm
         return if blob.blank?
         return if blob.byte_size > Config::TRANSCRIPTION_BYTE_LIMIT
 
+        started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         temp_file_path = download_to_temp(blob)
         File.open(temp_file_path, 'rb') do |file|
           response = client.audio.transcribe(
@@ -29,6 +30,9 @@ module Crm
           )
           response['text']
         end
+      rescue StandardError => e
+        log_failure(e, attachment: attachment, blob: blob, started_at: started_at)
+        raise
       ensure
         FileUtils.rm_f(temp_file_path) if temp_file_path.present?
       end
@@ -74,6 +78,23 @@ module Crm
         return if subtype.blank?
 
         { 'x-m4a' => 'm4a', 'x-wav' => 'wav', 'x-mp3' => 'mp3' }.fetch(subtype, subtype)
+      end
+
+      def log_failure(error, attachment:, blob:, started_at:)
+        latency = started_at ? ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round : nil
+        Rails.logger.error(
+          "[crm][ai][openai_error] operation=audio.transcription model=#{Config::TRANSCRIBE_MODEL} " \
+          "error_type=#{error.class.name} credential_source=#{@credential[:source]} api_host=#{api_host} " \
+          "attachment_id=#{attachment&.id} blob_byte_size=#{blob&.byte_size} latency_ms=#{latency} " \
+          "message=#{error.message.to_s.truncate(300)}"
+        )
+      end
+
+      def api_host
+        base = @credential[:api_base].to_s.strip.presence || 'https://api.openai.com'
+        URI.parse(base).host
+      rescue StandardError
+        nil
       end
     end
   end

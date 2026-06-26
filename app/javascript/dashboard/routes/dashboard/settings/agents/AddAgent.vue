@@ -57,9 +57,7 @@ const finishAndClose = () => {
 };
 
 const shouldShowManualInvitation = invitation =>
-  invitation?.pending_invitation &&
-  invitation?.invitation_url &&
-  (invitation?.email_delivery_failed || invitation?.manual_share_required);
+  invitation?.pending_invitation && invitation?.invitation_url;
 
 const copyManualInvitation = async () => {
   try {

@@ -45,13 +45,13 @@
       "API": {
         "SUCCESS_MESSAGE": "Agente adicionado com sucesso",
         "INVITATION_SENT": "Convite enviado com sucesso. O agente acessará a plataforma após aceitar o convite e fazer login.",
-        "INVITATION_MANUAL_SHARE": "O convite foi criado, mas o e-mail não foi enviado. Copie o link e compartilhe manualmente.",
+        "INVITATION_MANUAL_SHARE": "O convite foi criado. Copie o link abaixo se quiser compartilhar manualmente.",
         "EXIST_MESSAGE": "O E-mail do informado já está uso, por favor tente outro endereço de e-mail",
         "ERROR_MESSAGE": "Não foi possível conectar ao servidor Woot, por favor tente novamente mais tarde"
       },
       "MANUAL_INVITATION": {
-        "TITLE": "Compartilhar convite manualmente",
-        "DESC": "O convite foi criado, mas o e-mail não foi disparado. Envie este link para o agente concluir o cadastro.",
+        "TITLE": "Link do convite",
+        "DESC": "Compartilhe este link com o agente caso ele não receba o e-mail ou precise concluir o cadastro por outro canal.",
         "COPY": "Copiar link",
         "COPY_SUCCESS": "Link do convite copiado.",
         "COPY_ERROR": "Não foi possível copiar o link. Selecione e copie manualmente."

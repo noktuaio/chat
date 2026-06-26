@@ -17,6 +17,36 @@ RSpec.describe 'Enterprise Agents API', type: :request do
         expect(agent.account_users.first.custom_role_id).to eq(custom_role.id)
         expect(JSON.parse(response.body)['custom_role_id']).to eq(custom_role.id)
       end
+
+      it 'returns Autonomia invitation details without requiring a local agent record' do
+        invitation = Autonomia::ProductInvitations::AgentInviter::Result.new(
+          email: 'admin@example.com',
+          name: 'Admin User',
+          role: 'administrator',
+          invitation_url: 'https://agents.autonomia.site/accept-invitation?token=test',
+          email_delivery_failed: false,
+          manual_share_required: false,
+          email_delivery_error: nil
+        )
+        inviter = instance_double(Autonomia::ProductInvitations::AgentInviter, perform: invitation)
+
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with('AUTONOMIA_PRODUCT_INVITATIONS_ENABLED', anything).and_return('true')
+        allow(Autonomia::ProductInvitations::AgentInviter).to receive(:new).and_return(inviter)
+
+        post "/api/v1/accounts/#{account.id}/agents",
+             headers: admin.create_new_auth_token,
+             params: { email: 'admin@example.com', name: 'Admin User', role: 'administrator' },
+             as: :json
+
+        expect(response).to have_http_status(:created)
+        expect(response.parsed_body).to include(
+          'pending_invitation' => true,
+          'email' => 'admin@example.com',
+          'role' => 'administrator',
+          'invitation_url' => 'https://agents.autonomia.site/accept-invitation?token=test'
+        )
+      end
     end
   end
 

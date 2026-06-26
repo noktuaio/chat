@@ -1,6 +1,9 @@
 name: Deploy Autonomia Chatwoot Blue Green
 
 on:
+  pull_request_review:
+    types:
+      - submitted
   workflow_dispatch:
     inputs:
       action:
@@ -44,13 +47,20 @@ env:
 jobs:
   deploy:
     name: Deploy Green
-    if: github.event.inputs.action == 'deploy'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy') ||
+      (github.event_name == 'pull_request_review' &&
+        github.event.review.state == 'approved' &&
+        github.event.pull_request.base.ref == 'main' &&
+        github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -453,6 +463,14 @@ jobs:
           echo "SSO redirect smoke test failed"
           exit 1
 
+      - name: Stop blue instance after MVP grace period
+        run: |
+          echo "Keeping previous Blue instance online for 5 minutes before stopping it."
+          sleep 300
+
+          aws ec2 stop-instances \
+            --instance-ids "$BLUE_INSTANCE_ID"
+
       - name: Cleanup failed green resources before traffic shift
         if: failure() && env.TRAFFIC_SHIFT_DONE != 'true'
         run: |
@@ -517,6 +535,42 @@ jobs:
             --name "$CURRENT_INSTANCE_PARAMETER" \
             --query Parameter.Value \
             --output text)
+
+          previous_state=$(aws ec2 describe-instances \
+            --instance-ids "$previous_instance_id" \
+            --query 'Reservations[0].Instances[0].State.Name' \
+            --output text)
+
+          if [ "$previous_state" = "stopped" ] || [ "$previous_state" = "stopping" ]; then
+            aws ec2 start-instances \
+              --instance-ids "$previous_instance_id"
+            aws ec2 wait instance-running \
+              --instance-ids "$previous_instance_id"
+          fi
+
+          for attempt in $(seq 1 60); do
+            ping_status=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$previous_instance_id" \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text 2>/dev/null || true)
+            if [ "$ping_status" = "Online" ]; then
+              break
+            fi
+            echo "Waiting for SSM on previous instance $previous_instance_id, attempt $attempt"
+            sleep 15
+          done
+
+          previous_web_command_id=$(aws ssm send-command \
+            --instance-ids "$previous_instance_id" \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=["sudo systemctl start chatwoot-web.service","for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/ && exit 0; sleep 5; done; journalctl -u chatwoot-web.service --no-pager -n 120; exit 1"]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$previous_web_command_id" \
+            --instance-id "$previous_instance_id"
+
           lb_arn=$(aws elbv2 describe-load-balancers \
             --names "$ALB_NAME" \
             --query 'LoadBalancers[0].LoadBalancerArn' \

@@ -325,6 +325,8 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "ec2:DescribeImages",
           "ec2:DescribeInstances",
           "ec2:RunInstances",
+          "ec2:StartInstances",
+          "ec2:StopInstances",
           "ec2:TerminateInstances"
         ]
         Resource = "*"

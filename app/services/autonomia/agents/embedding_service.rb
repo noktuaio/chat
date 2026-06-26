@@ -19,9 +19,10 @@ class Autonomia::Agents::EmbeddingService
   def embed(text)
     return [] if text.blank?
 
+    started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     context.embed(text, model: @model).vectors
   rescue RubyLLM::Error => e
-    Rails.logger.error "Autonomia embedding error: #{e.message}"
+    log_failure(e, started_at: started_at)
     raise EmbeddingError, "Failed to create an embedding: #{e.message}"
   end
 
@@ -56,5 +57,22 @@ class Autonomia::Agents::EmbeddingService
         config.openai_api_base = base if base.present?
       end
     end
+  end
+
+  def log_failure(error, started_at:)
+    latency = started_at ? ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round : nil
+    Rails.logger.error(
+      "[crm][ai][openai_error] operation=autonomia.embedding model=#{@model} error_type=#{error.class.name} " \
+      "account_id=#{@account&.id} api_host=#{api_host} latency_ms=#{latency} " \
+      "message=#{error.message.to_s.truncate(300)}"
+    )
+  end
+
+  def api_host
+    cred = Crm::Ai::CredentialResolver.new(account: @account).resolve
+    base = cred.to_h[:api_base].to_s.strip.presence || OPENAI_DEFAULT_BASE
+    URI.parse(base).host
+  rescue StandardError
+    nil
   end
 end

@@ -23,6 +23,20 @@ RSpec.describe Internal::CheckNewVersionsJob do
     expect(InstallationConfig.find_by(name: 'CHATWOOT_SUPPORT_SCRIPT_URL').value).to eq '123'
   end
 
+  it 'preserves the locally configured self-hosted enterprise plan' do
+    data = { 'version' => '1.2.3', 'plan' => 'community', 'plan_quantity' => 0, 'chatwoot_support_website_token' => '123',
+             'chatwoot_support_identifier_hash' => '123', 'chatwoot_support_script_url' => '123' }
+    allow(ChatwootHub).to receive(:sync_with_hub).and_return(data)
+    allow(ChatwootApp).to receive(:self_hosted_enterprise_configured?).and_return(true)
+
+    with_modified_env INSTALLATION_PRICING_PLAN_QUANTITY: '10000' do
+      job
+    end
+
+    expect(InstallationConfig.find_by(name: 'INSTALLATION_PRICING_PLAN').value).to eq 'enterprise'
+    expect(InstallationConfig.find_by(name: 'INSTALLATION_PRICING_PLAN_QUANTITY').value).to eq 10_000
+  end
+
   it 'calls Internal::ReconcilePlanConfigService' do
     data = { 'version' => '1.2.3' }
     allow(ChatwootHub).to receive(:sync_with_hub).and_return(data)
