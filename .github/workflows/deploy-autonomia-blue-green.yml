@@ -1,0 +1,529 @@
+name: Deploy Autonomia Chatwoot Blue Green
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Deploy a new green instance or roll back to the previous target group.
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - rollback
+      green_instance_type:
+        description: EC2 instance type for the new green instance.
+        required: false
+        default: t3.small
+        type: string
+
+concurrency:
+  group: deploy-autonomia-blue-green
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_ACCOUNT_ID: '140023375763'
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::140023375763:role/chatwoot-autonomia-prod-github-actions-deploy
+  ALB_NAME: chatwoot-autonomia-prod-ec2
+  DOMAIN_NAME: agents.autonomia.site
+  EC2_ALB_DNS_NAME: chatwoot-autonomia-prod-ec2-1353010243.us-east-1.elb.amazonaws.com
+  ECR_REPOSITORY: chatwoot-autonomia-prod
+  ENV_PARAMETER: /chatwoot/prod/env
+  RUNTIME_IMAGE_PARAMETER: /chatwoot/prod/runtime-image
+  STABLE_IMAGE_TAG: autonomia-custom-image-port-ee
+  PREVIOUS_TG_PARAMETER: /chatwoot/prod/blue-green/previous-target-group-arn
+  CURRENT_TG_PARAMETER: /chatwoot/prod/blue-green/current-target-group-arn
+  CURRENT_INSTANCE_PARAMETER: /chatwoot/prod/blue-green/current-instance-id
+  PREVIOUS_INSTANCE_PARAMETER: /chatwoot/prod/blue-green/previous-instance-id
+
+jobs:
+  deploy:
+    name: Deploy Green
+    if: github.event.inputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Prepare Chatwoot image
+        run: |
+          sed -i 's|FROM node:24-alpine as node|FROM public.ecr.aws/docker/library/node:24-alpine as node|' docker/Dockerfile
+          sed -i 's|FROM ruby:3.4.4-alpine3.21|FROM public.ecr.aws/docker/library/ruby:3.4.4-alpine3.21|g' docker/Dockerfile
+          echo 'ENV CW_EDITION="ee"' >> docker/Dockerfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.STABLE_IMAGE_TAG }}
+          cache-from: type=gha,scope=chatwoot-autonomia-prod-linux-amd64
+          cache-to: type=gha,mode=max,scope=chatwoot-autonomia-prod-linux-amd64
+
+      - name: Publish runtime image parameter
+        env:
+          IMAGE_URI: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          aws ssm put-parameter \
+            --name "$RUNTIME_IMAGE_PARAMETER" \
+            --type String \
+            --value "$IMAGE_URI" \
+            --overwrite
+
+      - name: Discover current infrastructure
+        run: |
+          lb_arn=$(aws elbv2 describe-load-balancers \
+            --names "$ALB_NAME" \
+            --query 'LoadBalancers[0].LoadBalancerArn' \
+            --output text)
+          listener_arn=$(aws elbv2 describe-listeners \
+            --load-balancer-arn "$lb_arn" \
+            --query 'Listeners[?Port==`443`].ListenerArn | [0]' \
+            --output text)
+          vpc_id=$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns "$lb_arn" \
+            --query 'LoadBalancers[0].VpcId' \
+            --output text)
+          current_tg_arn=$(aws elbv2 describe-listeners \
+            --listener-arns "$listener_arn" \
+            --query 'Listeners[0].DefaultActions[0].TargetGroupArn' \
+            --output text)
+          current_instance_id=$(aws elbv2 describe-target-health \
+            --target-group-arn "$current_tg_arn" \
+            --query 'TargetHealthDescriptions[0].Target.Id' \
+            --output text)
+          current_instance=$(aws ec2 describe-instances \
+            --instance-ids "$current_instance_id" \
+            --query 'Reservations[0].Instances[0]' \
+            --output json)
+          subnet_id=$(printf '%s' "$current_instance" | jq -r '.SubnetId')
+          security_group_ids=$(printf '%s' "$current_instance" | jq -r '[.SecurityGroups[].GroupId] | join(" ")')
+          iam_profile_arn=$(printf '%s' "$current_instance" | jq -r '.IamInstanceProfile.Arn')
+          iam_profile_name=${iam_profile_arn##*/}
+          ami_id=$(aws ec2 describe-images \
+            --owners amazon \
+            --filters 'Name=name,Values=al2023-ami-2023*-x86_64' 'Name=architecture,Values=x86_64' 'Name=virtualization-type,Values=hvm' \
+            --query 'sort_by(Images,&CreationDate)[-1].ImageId' \
+            --output text)
+          root_device_name=$(aws ec2 describe-images \
+            --image-ids "$ami_id" \
+            --query 'Images[0].RootDeviceName' \
+            --output text)
+
+          {
+            echo "LB_ARN=$lb_arn"
+            echo "LISTENER_ARN=$listener_arn"
+            echo "VPC_ID=$vpc_id"
+            echo "BLUE_TG_ARN=$current_tg_arn"
+            echo "BLUE_INSTANCE_ID=$current_instance_id"
+            echo "SUBNET_ID=$subnet_id"
+            echo "SECURITY_GROUP_IDS=$security_group_ids"
+            echo "IAM_PROFILE_NAME=$iam_profile_name"
+            echo "AMI_ID=$ami_id"
+            echo "ROOT_DEVICE_NAME=$root_device_name"
+            echo "TRAFFIC_SHIFT_DONE=false"
+          } >> "$GITHUB_ENV"
+
+      - name: Create green user data
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          cat > green-user-data.sh <<'USERDATA'
+          #!/bin/bash
+          set -euxo pipefail
+
+          AWS_REGION="__AWS_REGION__"
+          ECR_REGISTRY="__ECR_REGISTRY__"
+          ENV_PARAMETER="__ENV_PARAMETER__"
+          RUNTIME_PARAMETER="__RUNTIME_PARAMETER__"
+          APP_DIR="/opt/chatwoot"
+
+          dnf update -y
+          dnf install -y docker awscli
+          systemctl enable --now docker
+
+          mkdir -p "$APP_DIR"
+
+          aws ssm get-parameter \
+            --region "$AWS_REGION" \
+            --name "$ENV_PARAMETER" \
+            --with-decryption \
+            --query Parameter.Value \
+            --output text > "$APP_DIR/.env"
+          chmod 600 "$APP_DIR/.env"
+
+          IMAGE_URI="$(aws ssm get-parameter \
+            --region "$AWS_REGION" \
+            --name "$RUNTIME_PARAMETER" \
+            --query Parameter.Value \
+            --output text)"
+
+          cat > "$APP_DIR/runtime.env" <<EOF
+          IMAGE_URI=$IMAGE_URI
+          AWS_REGION=$AWS_REGION
+          ECR_REGISTRY=$ECR_REGISTRY
+          START_WORKER_AFTER_DEPLOY=false
+          EOF
+
+          cat > "$APP_DIR/deploy.sh" <<'EOF'
+          #!/bin/bash
+          set -euxo pipefail
+
+          APP_DIR="/opt/chatwoot"
+          source "$APP_DIR/runtime.env"
+          START_WORKER_AFTER_DEPLOY="${START_WORKER_AFTER_DEPLOY:-true}"
+
+          if [ "$#" -gt 0 ] && [ -n "$1" ]; then
+            IMAGE_URI="$1"
+            {
+              echo "IMAGE_URI=$IMAGE_URI"
+              echo "AWS_REGION=$AWS_REGION"
+              echo "ECR_REGISTRY=$ECR_REGISTRY"
+              echo "START_WORKER_AFTER_DEPLOY=$START_WORKER_AFTER_DEPLOY"
+            } > "$APP_DIR/runtime.env"
+          fi
+
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          docker pull "$IMAGE_URI"
+          docker run --rm --env-file "$APP_DIR/.env" "$IMAGE_URI" bundle exec rails db:chatwoot_prepare
+          systemctl restart chatwoot-web.service
+          if [ "$START_WORKER_AFTER_DEPLOY" = "true" ]; then
+            systemctl restart chatwoot-worker.service
+          else
+            systemctl stop chatwoot-worker.service || true
+          fi
+          docker image prune -f
+          EOF
+          chmod +x "$APP_DIR/deploy.sh"
+
+          cat > /etc/systemd/system/chatwoot-web.service <<'EOF'
+          [Unit]
+          Description=Chatwoot web
+          After=docker.service network-online.target
+          Requires=docker.service
+
+          [Service]
+          Restart=always
+          RestartSec=10
+          EnvironmentFile=/opt/chatwoot/runtime.env
+          ExecStartPre=-/usr/bin/docker rm -f chatwoot-web
+          ExecStart=/usr/bin/docker run --rm --name chatwoot-web --env-file /opt/chatwoot/.env -p 3000:3000 $IMAGE_URI bundle exec rails s -p 3000 -b 0.0.0.0
+          ExecStop=/usr/bin/docker stop chatwoot-web
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          cat > /etc/systemd/system/chatwoot-worker.service <<'EOF'
+          [Unit]
+          Description=Chatwoot worker
+          After=docker.service network-online.target
+          Requires=docker.service
+
+          [Service]
+          Restart=always
+          RestartSec=10
+          EnvironmentFile=/opt/chatwoot/runtime.env
+          ExecStartPre=-/usr/bin/docker rm -f chatwoot-worker
+          ExecStart=/usr/bin/docker run --rm --name chatwoot-worker --env-file /opt/chatwoot/.env $IMAGE_URI bundle exec sidekiq -C config/sidekiq.yml
+          ExecStop=/usr/bin/docker stop chatwoot-worker
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+          systemctl enable chatwoot-web.service
+          "$APP_DIR/deploy.sh"
+          USERDATA
+
+          sed -i "s|__AWS_REGION__|$AWS_REGION|g" green-user-data.sh
+          sed -i "s|__ECR_REGISTRY__|$ECR_REGISTRY|g" green-user-data.sh
+          sed -i "s|__ENV_PARAMETER__|$ENV_PARAMETER|g" green-user-data.sh
+          sed -i "s|__RUNTIME_PARAMETER__|$RUNTIME_IMAGE_PARAMETER|g" green-user-data.sh
+
+      - name: Launch green EC2 instance
+        run: |
+          green_instance_id=$(aws ec2 run-instances \
+            --image-id "$AMI_ID" \
+            --instance-type "${{ github.event.inputs.green_instance_type || 't3.small' }}" \
+            --subnet-id "$SUBNET_ID" \
+            --security-group-ids $SECURITY_GROUP_IDS \
+            --iam-instance-profile "Name=$IAM_PROFILE_NAME" \
+            --user-data file://green-user-data.sh \
+            --block-device-mappings "[{\"DeviceName\":\"$ROOT_DEVICE_NAME\",\"Ebs\":{\"VolumeSize\":50,\"VolumeType\":\"gp3\",\"Encrypted\":true,\"DeleteOnTermination\":true}}]" \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=chatwoot-autonomia-prod-ec2-green-${GITHUB_RUN_ID}},{Key=Project,Value=chatwoot-autonomia},{Key=Environment,Value=prod},{Key=ManagedBy,Value=github-actions},{Key=BlueGreenRole,Value=green}]" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+
+          echo "GREEN_INSTANCE_ID=$green_instance_id" >> "$GITHUB_ENV"
+          aws ec2 wait instance-running --instance-ids "$green_instance_id"
+
+      - name: Wait for green SSM and local health
+        run: |
+          for attempt in $(seq 1 60); do
+            ping_status=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$GREEN_INSTANCE_ID" \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text 2>/dev/null || true)
+            if [ "$ping_status" = "Online" ]; then
+              break
+            fi
+            echo "Waiting for SSM on $GREEN_INSTANCE_ID, attempt $attempt"
+            sleep 15
+          done
+
+          command_id=$(aws ssm send-command \
+            --instance-ids "$GREEN_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=["for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/ && exit 0; sleep 10; done; journalctl -u chatwoot-web.service --no-pager -n 120; exit 1"]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$command_id" \
+            --instance-id "$GREEN_INSTANCE_ID"
+
+          aws ssm get-command-invocation \
+            --command-id "$command_id" \
+            --instance-id "$GREEN_INSTANCE_ID" \
+            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}' \
+            --output json
+
+      - name: Register green target group
+        run: |
+          green_tg_name="cw-auto-green-${GITHUB_RUN_NUMBER}"
+          green_tg_arn=$(aws elbv2 create-target-group \
+            --name "$green_tg_name" \
+            --protocol HTTP \
+            --port 3000 \
+            --vpc-id "$VPC_ID" \
+            --target-type instance \
+            --health-check-enabled \
+            --health-check-path "/" \
+            --health-check-interval-seconds 30 \
+            --health-check-timeout-seconds 5 \
+            --healthy-threshold-count 2 \
+            --unhealthy-threshold-count 5 \
+            --matcher HttpCode=200-399 \
+            --query 'TargetGroups[0].TargetGroupArn' \
+            --output text)
+
+          echo "GREEN_TG_ARN=$green_tg_arn" >> "$GITHUB_ENV"
+
+          aws elbv2 register-targets \
+            --target-group-arn "$green_tg_arn" \
+            --targets "Id=$GREEN_INSTANCE_ID,Port=3000"
+
+          aws elbv2 wait target-in-service \
+            --target-group-arn "$green_tg_arn" \
+            --targets "Id=$GREEN_INSTANCE_ID,Port=3000"
+
+      - name: Switch Sidekiq workers to green
+        run: |
+          blue_command_id=$(aws ssm send-command \
+            --instance-ids "$BLUE_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=["sudo systemctl stop chatwoot-worker.service"]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$blue_command_id" \
+            --instance-id "$BLUE_INSTANCE_ID"
+
+          aws ssm get-command-invocation \
+            --command-id "$blue_command_id" \
+            --instance-id "$BLUE_INSTANCE_ID" \
+            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}' \
+            --output json
+
+          green_command_id=$(aws ssm send-command \
+            --instance-ids "$GREEN_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=["sudo sed -i /^START_WORKER_AFTER_DEPLOY=/d /opt/chatwoot/runtime.env","echo START_WORKER_AFTER_DEPLOY=true | sudo tee -a /opt/chatwoot/runtime.env","sudo systemctl enable chatwoot-worker.service","sudo systemctl start chatwoot-worker.service","sudo systemctl is-active --quiet chatwoot-worker.service"]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$green_command_id" \
+            --instance-id "$GREEN_INSTANCE_ID"
+
+          aws ssm get-command-invocation \
+            --command-id "$green_command_id" \
+            --instance-id "$GREEN_INSTANCE_ID" \
+            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}' \
+            --output json
+
+      - name: Shift HTTPS listener to green
+        run: |
+          aws ssm put-parameter --name "$PREVIOUS_TG_PARAMETER" --type String --value "$BLUE_TG_ARN" --overwrite
+          aws ssm put-parameter --name "$PREVIOUS_INSTANCE_PARAMETER" --type String --value "$BLUE_INSTANCE_ID" --overwrite
+          aws ssm put-parameter --name "$CURRENT_TG_PARAMETER" --type String --value "$GREEN_TG_ARN" --overwrite
+          aws ssm put-parameter --name "$CURRENT_INSTANCE_PARAMETER" --type String --value "$GREEN_INSTANCE_ID" --overwrite
+
+          aws elbv2 modify-listener \
+            --listener-arn "$LISTENER_ARN" \
+            --default-actions "Type=forward,TargetGroupArn=$GREEN_TG_ARN"
+
+          echo "TRAFFIC_SHIFT_DONE=true" >> "$GITHUB_ENV"
+
+      - name: Verify public SSO redirect
+        run: |
+          for attempt in $(seq 1 18); do
+            headers=$(curl -k -sS -I --max-time 10 \
+              --connect-to "${DOMAIN_NAME}:443:${EC2_ALB_DNS_NAME}:443" \
+              "https://${DOMAIN_NAME}/auth/autonomia" || true)
+            status=$(printf '%s\n' "$headers" | awk 'NR == 1 {print $2}')
+            location=$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\r')
+
+            if [ -n "$location" ] \
+              && printf '%s\n' "$location" | grep -F 'client_id=talkai' \
+              && printf '%s\n' "$location" | grep -F 'redirect_uri=https%3A%2F%2Fagents.autonomia.site%2Fauth%2Fautonomia%2Fcallback'; then
+              echo "$location"
+              exit 0
+            fi
+
+            echo "Attempt $attempt: status=${status:-none} location=${location:-none}"
+            sleep 10
+          done
+
+          echo "SSO redirect smoke test failed"
+          exit 1
+
+      - name: Cleanup failed green resources before traffic shift
+        if: failure() && env.TRAFFIC_SHIFT_DONE != 'true'
+        run: |
+          if [ -n "${BLUE_INSTANCE_ID:-}" ]; then
+            blue_restore_command_id=$(aws ssm send-command \
+              --instance-ids "$BLUE_INSTANCE_ID" \
+              --document-name AWS-RunShellScript \
+              --parameters 'commands=["sudo sed -i /^START_WORKER_AFTER_DEPLOY=/d /opt/chatwoot/runtime.env","echo START_WORKER_AFTER_DEPLOY=true | sudo tee -a /opt/chatwoot/runtime.env","sudo systemctl enable chatwoot-worker.service","sudo systemctl start chatwoot-worker.service"]' \
+              --query 'Command.CommandId' \
+              --output text || true)
+
+            if [ -n "${blue_restore_command_id:-}" ] && [ "$blue_restore_command_id" != "None" ]; then
+              aws ssm wait command-executed \
+                --command-id "$blue_restore_command_id" \
+                --instance-id "$BLUE_INSTANCE_ID" || true
+            fi
+          fi
+
+          if [ -n "${GREEN_TG_ARN:-}" ]; then
+            aws elbv2 deregister-targets \
+              --target-group-arn "$GREEN_TG_ARN" \
+              --targets "Id=$GREEN_INSTANCE_ID,Port=3000" || true
+            aws elbv2 delete-target-group \
+              --target-group-arn "$GREEN_TG_ARN" || true
+          fi
+
+          if [ -n "${GREEN_INSTANCE_ID:-}" ]; then
+            aws ec2 terminate-instances \
+              --instance-ids "$GREEN_INSTANCE_ID" || true
+          fi
+
+  rollback:
+    name: Rollback To Previous Target Group
+    if: github.event.inputs.action == 'rollback'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Restore previous target group
+        run: |
+          previous_tg_arn=$(aws ssm get-parameter \
+            --name "$PREVIOUS_TG_PARAMETER" \
+            --query Parameter.Value \
+            --output text)
+          previous_instance_id=$(aws ssm get-parameter \
+            --name "$PREVIOUS_INSTANCE_PARAMETER" \
+            --query Parameter.Value \
+            --output text)
+          current_instance_id=$(aws ssm get-parameter \
+            --name "$CURRENT_INSTANCE_PARAMETER" \
+            --query Parameter.Value \
+            --output text)
+          lb_arn=$(aws elbv2 describe-load-balancers \
+            --names "$ALB_NAME" \
+            --query 'LoadBalancers[0].LoadBalancerArn' \
+            --output text)
+          listener_arn=$(aws elbv2 describe-listeners \
+            --load-balancer-arn "$lb_arn" \
+            --query 'Listeners[?Port==`443`].ListenerArn | [0]' \
+            --output text)
+
+          aws elbv2 modify-listener \
+            --listener-arn "$listener_arn" \
+            --default-actions "Type=forward,TargetGroupArn=$previous_tg_arn"
+
+          previous_command_id=$(aws ssm send-command \
+            --instance-ids "$previous_instance_id" \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=["sudo sed -i /^START_WORKER_AFTER_DEPLOY=/d /opt/chatwoot/runtime.env","echo START_WORKER_AFTER_DEPLOY=true | sudo tee -a /opt/chatwoot/runtime.env","sudo systemctl enable chatwoot-worker.service","sudo systemctl start chatwoot-worker.service","sudo systemctl is-active --quiet chatwoot-worker.service"]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$previous_command_id" \
+            --instance-id "$previous_instance_id"
+
+          current_command_id=$(aws ssm send-command \
+            --instance-ids "$current_instance_id" \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=["sudo sed -i /^START_WORKER_AFTER_DEPLOY=/d /opt/chatwoot/runtime.env","echo START_WORKER_AFTER_DEPLOY=false | sudo tee -a /opt/chatwoot/runtime.env","sudo systemctl stop chatwoot-worker.service"]' \
+            --query 'Command.CommandId' \
+            --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$current_command_id" \
+            --instance-id "$current_instance_id"
+
+      - name: Verify public SSO redirect after rollback
+        run: |
+          for attempt in $(seq 1 12); do
+            headers=$(curl -k -sS -I --max-time 10 \
+              --connect-to "${DOMAIN_NAME}:443:${EC2_ALB_DNS_NAME}:443" \
+              "https://${DOMAIN_NAME}/auth/autonomia" || true)
+            location=$(printf '%s\n' "$headers" | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\r')
+
+            if [ -n "$location" ] && printf '%s\n' "$location" | grep -F 'client_id=talkai'; then
+              echo "$location"
+              exit 0
+            fi
+
+            echo "Attempt $attempt: location=${location:-none}"
+            sleep 10
+          done
+
+          echo "Rollback smoke test failed"
+          exit 1
