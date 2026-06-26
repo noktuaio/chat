@@ -12,7 +12,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['select', 'edit-ai', 'delete']);
+const emit = defineEmits(['select', 'delete']);
 
 const { t } = useI18n();
 
@@ -108,14 +108,6 @@ const statusLabel = computed(() => {
     </div>
 
     <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
-      <NextButton
-        ghost
-        slate
-        xs
-        icon="i-lucide-wand-sparkles"
-        :label="t('AGENTS.HUB.EDIT_AI')"
-        @click="emit('edit-ai', agent)"
-      />
       <NextButton
         ghost
         ruby

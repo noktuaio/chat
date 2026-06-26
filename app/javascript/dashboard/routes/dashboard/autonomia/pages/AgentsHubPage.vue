@@ -36,13 +36,6 @@ const goToCreate = () => {
   router.push({ name: 'autonomia_agents_builder' });
 };
 
-const editAgentWithAI = agent => {
-  router.push({
-    name: 'autonomia_agents_builder_edit',
-    params: { agentId: agent.id },
-  });
-};
-
 const openAgent = agent => {
   router.push({
     name: 'autonomia_agent_panel',
@@ -176,7 +169,6 @@ onMounted(() => loadAgents());
           :key="agent.id"
           :agent="agent"
           @select="openAgent"
-          @edit-ai="editAgentWithAI"
           @delete="requestDeleteAgent"
         />
       </div>
