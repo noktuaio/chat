@@ -13,6 +13,7 @@ locals {
   github_actions_subjects = flatten([
     for repository in local.github_actions_repositories : [
       "repo:${repository}:ref:refs/heads/${var.github_branch}",
+      "repo:${repository}:pull_request",
       "repo:${repository}:environment:production"
     ]
   ])
