@@ -216,6 +216,7 @@
       "STANDALONE": "Standalone"
     },
     "RESULT_FILTER": {
+      "OPEN": "In progress",
       "WON": "Won",
       "LOST": "Lost",
       "ARCHIVED": "Archived"

@@ -4,8 +4,10 @@ class Crm::Cards::FilterQuery
   FILTER_ATTRIBUTES = %i[pipeline_id inbox_id owner_id priority external_id].freeze
   # List-view-only "Resultado" filter. Uses a DISTINCT param key (`result`) so it
   # never collides with the board filters (the board is strictly open-only and
-  # ignores it). Only the historical statuses are selectable here.
-  RESULT_STATUSES = %w[won lost archived].freeze
+  # ignores it). `open` is the in-funnel deal status (NOT the conversation
+  # status open/pending/resolved); the List status tabs select it explicitly so
+  # the default view shows only active deals instead of mixing every status.
+  RESULT_STATUSES = %w[open won lost archived].freeze
 
   # Whitelisted sort columns for the list view. Maps the public `sort` param to a
   # real `crm_cards` column. Anything outside this map falls back to the default

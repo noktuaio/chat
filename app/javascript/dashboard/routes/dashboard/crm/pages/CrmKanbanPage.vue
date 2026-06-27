@@ -24,6 +24,7 @@ import CrmBookingProfilesDrawer from '../components/CrmBookingProfilesDrawer.vue
 import CrmCardsTable from '../components/list/CrmCardsTable.vue';
 import CrmTableColumnSettings from '../components/list/CrmTableColumnSettings.vue';
 import CrmSavedViews from '../components/list/CrmSavedViews.vue';
+import CrmResultTabs from '../components/list/CrmResultTabs.vue';
 import CrmBulkActionBar from '../components/list/CrmBulkActionBar.vue';
 import CrmCalendar from '../components/calendar/CrmCalendar.vue';
 import CrmCalendarQuickAdd from '../components/calendar/CrmCalendarQuickAdd.vue';
@@ -158,6 +159,7 @@ const followUpStatusOptions = computed(() => [
 // List-view-only "Resultado" filter (won/lost/archived). The board stays
 // open-only, so this control is rendered only when viewMode === 'list'.
 const resultOptions = computed(() => [
+  { value: 'open', label: t('CRM_KANBAN.RESULT_FILTER.OPEN') },
   { value: 'won', label: t('CRM_KANBAN.RESULT_FILTER.WON') },
   { value: 'lost', label: t('CRM_KANBAN.RESULT_FILTER.LOST') },
   { value: 'archived', label: t('CRM_KANBAN.RESULT_FILTER.ARCHIVED') },
@@ -469,6 +471,13 @@ const applyFilters = async () => {
 
 const clearFilters = async () => {
   filters.value = defaultFilters();
+  await applyFilters();
+};
+
+// List status tabs (open/won/lost). Writes the same `filters.result` the Filtros
+// popover uses, so the tabs and the popover stay in sync.
+const selectResult = async value => {
+  filters.value.result = value;
   await applyFilters();
 };
 
@@ -2031,9 +2040,15 @@ onMounted(async () => {
       class="flex min-h-0 flex-1 flex-col px-8 py-5"
     >
       <div class="mb-3 flex items-center justify-between gap-2">
-        <p class="mb-0 text-xs text-n-slate-10">
-          {{ t('CRM_KANBAN.LIST.META', { count: cardsListMeta.count || 0 }) }}
-        </p>
+        <div class="flex items-center gap-3">
+          <CrmResultTabs
+            :model-value="filters.result"
+            @update:model-value="selectResult"
+          />
+          <p class="mb-0 text-xs text-n-slate-10">
+            {{ t('CRM_KANBAN.LIST.META', { count: cardsListMeta.count || 0 }) }}
+          </p>
+        </div>
         <div class="flex items-center gap-2">
           <CrmSavedViews
             :views="savedViews"
