@@ -1410,9 +1410,9 @@ onMounted(async () => {
 <template>
   <main class="flex h-full min-w-0 flex-col overflow-hidden bg-n-background">
     <header
-      class="flex flex-col gap-3 border-b border-n-weak px-8 py-3 lg:flex-row lg:items-center lg:justify-between"
+      class="flex flex-col gap-3 border-b border-n-weak px-8 py-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between"
     >
-      <div class="flex min-w-0 flex-wrap items-center gap-3">
+      <div class="flex shrink-0 items-center gap-3">
         <h1 class="mb-0 text-2xl font-medium text-n-slate-12">
           {{
             isCalendarOnly ? t('SIDEBAR.CRM_CALENDAR') : t('CRM_KANBAN.TITLE')
@@ -1521,7 +1521,7 @@ onMounted(async () => {
       <!-- Slim filter row: search + 2 high-frequency selects + Filters popover, with
            live pipeline status badges pushed to the right. Pipeline picker + Edit
            pipeline live in the header band above. -->
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-end gap-3">
         <div v-if="viewMode !== 'calendar'" class="min-w-[12rem] flex-1">
           <Input
             v-model="filters.search"
@@ -1832,7 +1832,7 @@ onMounted(async () => {
         <!-- Live pipeline status, absorbed from the old meta row to save vertical space. -->
         <div
           v-if="selectedPipeline"
-          class="ml-auto flex items-center gap-3 text-xs text-n-slate-11"
+          class="ml-auto flex h-10 items-center gap-3 text-xs text-n-slate-11"
         >
           <span
             class="inline-flex items-center gap-1.5 rounded-md bg-n-alpha-2 px-2 py-1"
