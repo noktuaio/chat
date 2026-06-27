@@ -10,7 +10,7 @@ safe_inbox = follow_up.inbox if [follow_up.card&.inbox_id, follow_up.conversatio
 safe_assignee = follow_up.assignee if [follow_up.card&.owner_id, follow_up.conversation&.assignee_id].include?(follow_up.assignee_id)
 safe_assignee ||= follow_up.assignee if Current.account_user&.administrator?
 
-json.extract! follow_up, :id, :card_id, :title, :description, :follow_up_type, :status, :automation_mode,
+json.extract! follow_up, :id, :account_id, :card_id, :title, :description, :follow_up_type, :status, :automation_mode,
               :timezone, :metadata
 json.contact_id safe_contact&.id
 json.inbox_id safe_inbox&.id

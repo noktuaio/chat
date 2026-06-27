@@ -12,13 +12,12 @@ export function useCrmFollowUpReminders() {
   const activeReminder = computed(() => queue.value[0] || null);
   const hasReminder = computed(() => queue.value.length > 0);
 
-  const normalizeReminder = payload => ({
-    ...payload,
-    account_id:
-      payload.account_id ||
-      window.chatwootConfig?.accountId ||
-      window.chatwootConfig?.account_id,
-  });
+  // account_id is serialized by both reminder sources — the CRM_FOLLOW_UP_DUE
+  // websocket (Broadcaster) and the GET reminders poll (_follow_up partial). No
+  // client-side fallback: window.chatwootConfig never carried an account id, so
+  // the old fallback silently produced `undefined`, breaking openCrm and the
+  // account-scoped complete/dismiss calls.
+  const normalizeReminder = payload => ({ ...payload });
 
   const enqueueReminder = payload => {
     if (!isCrmEnabled() || !payload?.id) return;
