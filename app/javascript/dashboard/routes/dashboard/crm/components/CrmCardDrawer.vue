@@ -406,8 +406,16 @@ const onContactSelected = () => {
   form.title = selectedContact.value.name || selectedContact.value.phone_number;
 };
 
+// Reset when the drawer opens or the selected card object changes. We intentionally
+// drop props.stages from the deps: realtime card events and the board poll rebuild
+// board.stages into a new array reference on every update, and a busy board would
+// re-run resetForm mid-edit, wiping the title/contact/follow-up fields being typed.
+// props.card is kept because the parent only rebinds selectedCard on explicit flows
+// (open, then shallow->detailed hydration) — never from realtime — so it does not
+// churn and its change must still re-hydrate the form. Stage <select> options bind
+// to props.stages directly, so they stay live without a reset.
 watch(
-  () => [props.show, props.card, props.stages],
+  () => [props.show, props.card],
   () => {
     if (props.show) resetForm();
   },

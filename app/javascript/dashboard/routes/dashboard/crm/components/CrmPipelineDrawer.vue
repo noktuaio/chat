@@ -264,12 +264,32 @@ const onSubmit = async () => {
   });
 };
 
+// Reset only when the drawer opens or the target pipeline identity changes.
+// We intentionally do NOT depend on props.stages content: realtime card events
+// rebuild board.stages into a new array reference on every update, and a busy
+// board would re-run resetForm mid-typing, wiping the stage name being edited.
 watch(
-  () => [props.show, props.pipeline, props.stages],
+  () => [props.show, props.pipeline?.id],
   () => {
     if (props.show) resetForm();
   },
   { immediate: true }
+);
+
+// Deleting a stage keeps the drawer open and removes it server-side, so we still
+// need to drop it from the form. Reconcile deletions only (a persisted stage that
+// vanished server-side) instead of a full resetForm, to preserve in-progress edits
+// to the remaining stages. New stages and renames are NOT pulled in from realtime.
+watch(
+  () => props.stages,
+  serverStages => {
+    if (!props.show || !isEditing.value) return;
+    const serverStageIds = new Set(serverStages.map(stage => stage.id));
+    const next = form.stages.filter(
+      stage => !stage.id || serverStageIds.has(stage.id)
+    );
+    if (next.length !== form.stages.length) form.stages = next;
+  }
 );
 
 watch(
