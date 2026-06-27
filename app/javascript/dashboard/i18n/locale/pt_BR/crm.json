@@ -216,6 +216,7 @@
       "STANDALONE": "Independente"
     },
     "RESULT_FILTER": {
+      "OPEN": "Em andamento",
       "WON": "Ganho",
       "LOST": "Perdido",
       "ARCHIVED": "Arquivado"

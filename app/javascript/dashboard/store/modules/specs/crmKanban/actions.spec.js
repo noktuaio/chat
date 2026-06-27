@@ -365,6 +365,77 @@ describe('#crmKanban board filters', () => {
     );
   });
 
+  it('refetches when a status change no longer matches the active result filter', () => {
+    const commit = vi.fn();
+    actions.handleRealtimeCardEvent(
+      {
+        commit,
+        state: {
+          board: { pipeline: { id: 7 } },
+          filters: { ...defaultFilters(), result: 'open' },
+        },
+      },
+      // card just marked won while the List shows the "Em andamento" (open) tab
+      {
+        event: 'crm.card.updated',
+        card: { id: 1, pipeline_id: 7, status: 'won' },
+      }
+    );
+
+    expect(emitter.emit).toHaveBeenCalledWith(BUS_EVENTS.CRM_BOARD_REFETCH);
+    expect(commit).not.toHaveBeenCalledWith(
+      types.UPSERT_CRM_CARD_IN_LIST,
+      expect.anything()
+    );
+  });
+
+  it('upserts without refetching when the card status matches the result filter', () => {
+    const commit = vi.fn();
+    actions.handleRealtimeCardEvent(
+      {
+        commit,
+        state: {
+          board: { pipeline: { id: 7 } },
+          filters: { ...defaultFilters(), result: 'open' },
+        },
+      },
+      {
+        event: 'crm.card.updated',
+        card: { id: 1, pipeline_id: 7, status: 'open' },
+      }
+    );
+
+    expect(emitter.emit).not.toHaveBeenCalled();
+    expect(commit).toHaveBeenCalledWith(types.UPSERT_CRM_CARD_IN_LIST, {
+      id: 1,
+      pipeline_id: 7,
+      status: 'open',
+    });
+  });
+
+  it('refetches a non-open card even when it matches result, since the board is open-only', () => {
+    const commit = vi.fn();
+    actions.handleRealtimeCardEvent(
+      {
+        commit,
+        state: {
+          board: { pipeline: { id: 7 } },
+          filters: { ...defaultFilters(), result: 'won' },
+        },
+      },
+      {
+        event: 'crm.card.updated',
+        card: { id: 1, pipeline_id: 7, status: 'won' },
+      }
+    );
+
+    expect(emitter.emit).toHaveBeenCalledWith(BUS_EVENTS.CRM_BOARD_REFETCH);
+    expect(commit).not.toHaveBeenCalledWith(
+      types.UPSERT_CRM_KANBAN_CARD,
+      expect.anything()
+    );
+  });
+
   it('upserts client-evaluable cards on realtime without refetching', () => {
     const commit = vi.fn();
     actions.handleRealtimeCardEvent(

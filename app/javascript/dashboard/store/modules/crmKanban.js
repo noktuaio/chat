@@ -19,7 +19,10 @@ export const defaultFilters = () => ({
   priority: '',
   standalone: '',
   followUpStatus: '',
-  result: '',
+  // Default the List to in-funnel deals ('open' card status, NOT conversation
+  // status). The board ignores `result` (fetchBoard strips it), so this only
+  // shapes the List default — surfaced by the status tabs in the list toolbar.
+  result: 'open',
   // PR14.7b/c high-value filters. Realtime contract per filter:
   //  - stageIds / teamId / valueMin / valueMax / staleDays are evaluable from a
   //    single card payload and ARE mirrored in cardMatchesFilters below.
@@ -1041,10 +1044,29 @@ export const actions = {
     const isArchived =
       event === 'crm.card.archived' || card.status === 'archived';
 
+    // Status transitions (won/lost/reopen) are invisible to cardMatchesFilters,
+    // which intentionally never evaluates status. Two collections care about it:
+    // the Kanban board is strictly open-only (server scope `.open`), so any
+    // non-open status leaves it; the List honors `filters.result`, so a status
+    // that mismatches an active result filter leaves it. Either way, defer to
+    // server truth (refetch the active view) instead of optimistically keeping a
+    // stale row. Guarded on a present status so normal stage moves still upsert.
+    // (Archived keeps its dedicated removal branch below.)
+    const statusLeavesView =
+      card.status != null &&
+      !isArchived &&
+      (!stringMatches(card.status, 'open') ||
+        (Boolean($state.filters.result) &&
+          !stringMatches(card.status, $state.filters.result)));
+
     // Server-only filters cannot be evaluated from this single card payload, so
     // trusting cardMatchesFilters would reintroduce the status-style realtime bug.
     // Defer to server truth: refetch the active view (the page handles the event).
-    if (isSamePipeline && !isArchived && hasServerOnlyFilters($state.filters)) {
+    if (
+      isSamePipeline &&
+      !isArchived &&
+      (statusLeavesView || hasServerOnlyFilters($state.filters))
+    ) {
       emitter.emit(BUS_EVENTS.CRM_BOARD_REFETCH);
       return;
     }
