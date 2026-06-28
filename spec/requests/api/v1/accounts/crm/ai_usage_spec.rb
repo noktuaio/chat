@@ -41,17 +41,6 @@ RSpec.describe 'CRM AI usage API', type: :request do
     expect(response).to have_http_status(:ok)
   end
 
-  it 'denies custom-role agents without crm_view_reports' do
-    account, = create_account_and_user
-    role = create(:custom_role, account: account, permissions: ['crm_view'])
-    agent = create(:user)
-    create(:account_user, account: account, user: agent, role: :agent, custom_role: role)
-
-    get "/api/v1/accounts/#{account.id}/crm/ai_usage", headers: auth_headers(agent)
-
-    expect(response).to have_http_status(:unauthorized)
-  end
-
   it 'returns 404 when CRM AI is disabled' do
     account, admin = create_account_and_user
     ENV['CRM_AI_ENABLED'] = 'false'

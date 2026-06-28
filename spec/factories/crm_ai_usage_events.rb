@@ -3,7 +3,7 @@ FactoryBot.define do
     account
     pipeline_id { nil }
 
-    feature { 'agente_resposta' }
+    add_attribute(:feature) { 'agente_resposta' }
     model { 'gpt-5.4-mini' }
     input_tokens { 1000 }
     cached_tokens { 0 }
