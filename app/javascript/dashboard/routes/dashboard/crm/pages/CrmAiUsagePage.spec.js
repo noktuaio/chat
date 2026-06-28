@@ -185,5 +185,7 @@ describe('CrmAiUsagePage', () => {
     expect(CrmAiUsageAPI.get).toHaveBeenLastCalledWith(
       expect.objectContaining({ group_by: 'day' })
     );
+    expect(wrapper.text()).toContain('Monthly spend');
+    expect(wrapper.text()).toContain('Monthly spend (by day)');
   });
 });

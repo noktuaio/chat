@@ -91,6 +91,11 @@
     },
     "KPI": {
       "SPEND": "Weekly spend",
+      "SPEND_BY_PERIOD": {
+        "TODAY": "Today's spend",
+        "WEEK": "Weekly spend",
+        "MONTH": "Monthly spend"
+      },
       "SPEND_INFO": "Total AI cost in the selected period.",
       "USAGE": "AI uses",
       "USAGE_INFO": "Number of AI usage events in the selected period.",
@@ -102,6 +107,11 @@
     "SECTIONS": {
       "SPEND_BY_RESOURCE": "Spend by resource",
       "WEEKLY_SPEND": "Weekly spend (by day)",
+      "SPEND_BY_PERIOD": {
+        "TODAY": "Spend today (by hour)",
+        "WEEK": "Weekly spend (by day)",
+        "MONTH": "Monthly spend (by day)"
+      },
       "HISTORY": "Usage history"
     },
     "TABLE": {

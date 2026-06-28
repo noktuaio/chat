@@ -35,6 +35,17 @@ const ensureCrmEnabled = (to, _from, next) => {
   next({ name: 'home', params: to.params });
 };
 
+const ensureCrmAiEnabled = (to, _from, next) => {
+  if (
+    window.globalConfig?.CRM_KANBAN_ENABLED === 'true' &&
+    window.globalConfig?.CRM_AI_ENABLED === 'true'
+  ) {
+    next();
+    return;
+  }
+  next({ name: 'home', params: to.params });
+};
+
 export const routes = [
   {
     path: frontendURL('accounts/:accountId/crm'),
@@ -63,7 +74,7 @@ export const routes = [
     path: frontendURL('accounts/:accountId/crm/ai-usage'),
     name: 'crm_ai_usage_index',
     meta: reportsMeta,
-    beforeEnter: ensureCrmEnabled,
+    beforeEnter: ensureCrmAiEnabled,
     component: CrmAiUsagePage,
   },
   {

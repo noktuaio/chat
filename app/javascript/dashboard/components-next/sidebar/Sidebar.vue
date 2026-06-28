@@ -103,6 +103,7 @@ const whatsappApiCampaignsEnabled = computed(
 const crmKanbanEnabled = computed(
   () => globalConfig.value?.crmKanbanEnabled === true
 );
+const crmAiEnabled = computed(() => globalConfig.value?.crmAiEnabled === true);
 // ENV master (kill-switch global) exposto ao FE via globalConfig.
 const autonomiaAgentsMasterFlag = computed(
   () => globalConfig.value?.autonomiaAgentsEnabled === true
@@ -729,6 +730,10 @@ const menuItems = computed(() => {
                       to: accountScopedRoute('crm_dashboard_index'),
                       activeOn: ['crm_dashboard_index'],
                     },
+                  ]
+                : []),
+              ...(canViewCrmReports.value && crmAiEnabled.value
+                ? [
                     {
                       name: 'CRM AI Usage',
                       label: t('CRM_AI_USAGE.HEADER.TITLE'),

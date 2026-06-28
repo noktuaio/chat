@@ -81,6 +81,21 @@ RSpec.describe 'CRM AI usage API', type: :request do
     expect(response.body).not_to include('response')
   end
 
+  it 'neutralizes CSV formula injection in text cells' do
+    account, admin = create_account_and_user
+    account.update!(name: '=cmd()')
+    create(:crm_ai_usage_event, account: account, feature: 'copilot', model: 'gpt-5.4', cost_estimate: 0.02)
+
+    get "/api/v1/accounts/#{account.id}/crm/ai_usage/export",
+        params: { export_format: 'csv' },
+        headers: auth_headers(admin)
+
+    row = CSV.parse(response.body, headers: true).first
+
+    expect(response).to have_http_status(:ok)
+    expect(row['Conta']).to eq("'=cmd()")
+  end
+
   it 'exports JSON without model or content fields' do
     account, admin = create_account_and_user
     create(:crm_ai_usage_event, account: account, feature: 'kb_revisao', model: 'gpt-5.4', cost_estimate: 0.02)

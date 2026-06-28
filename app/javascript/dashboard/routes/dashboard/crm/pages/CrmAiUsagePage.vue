@@ -20,6 +20,18 @@ const PERIODS = [
   { key: 'MONTH', days: 30, groupBy: 'day' },
 ];
 
+const PERIOD_SPEND_LABEL_KEYS = {
+  TODAY: 'CRM_AI_USAGE.KPI.SPEND_BY_PERIOD.TODAY',
+  WEEK: 'CRM_AI_USAGE.KPI.SPEND_BY_PERIOD.WEEK',
+  MONTH: 'CRM_AI_USAGE.KPI.SPEND_BY_PERIOD.MONTH',
+};
+
+const PERIOD_SERIES_LABEL_KEYS = {
+  TODAY: 'CRM_AI_USAGE.SECTIONS.SPEND_BY_PERIOD.TODAY',
+  WEEK: 'CRM_AI_USAGE.SECTIONS.SPEND_BY_PERIOD.WEEK',
+  MONTH: 'CRM_AI_USAGE.SECTIONS.SPEND_BY_PERIOD.MONTH',
+};
+
 const WIDTH_CLASSES = [
   'w-0',
   'w-[5%]',
@@ -168,12 +180,20 @@ const hasResourceSpend = computed(() =>
 const chartMoneyKey = computed(() =>
   rateUnavailable.value ? 'cost_usd' : 'cost_brl'
 );
+const periodSpendLabel = computed(() => {
+  // eslint-disable-next-line @intlify/vue-i18n/no-dynamic-keys
+  return t(PERIOD_SPEND_LABEL_KEYS[selectedPeriod.value.key]);
+});
+const periodSeriesLabel = computed(() => {
+  // eslint-disable-next-line @intlify/vue-i18n/no-dynamic-keys
+  return t(PERIOD_SERIES_LABEL_KEYS[selectedPeriod.value.key]);
+});
 
 const weeklySpendCollection = computed(() => ({
   labels: timeSeries.value.map(point => formatBucket(point.timestamp)),
   datasets: [
     {
-      label: t('CRM_AI_USAGE.SECTIONS.WEEKLY_SPEND'),
+      label: periodSeriesLabel.value,
       backgroundColor: '#2563eb',
       data: timeSeries.value.map(point =>
         Number(point[chartMoneyKey.value] || point.cost_usd || 0)
@@ -189,7 +209,7 @@ const hasTimeSeries = computed(() =>
 const topCards = computed(() => [
   {
     key: 'SPEND',
-    label: t('CRM_AI_USAGE.KPI.SPEND'),
+    label: periodSpendLabel.value,
     value: formatMoneyPayload(totals.value.period_spend),
     infoText: t('CRM_AI_USAGE.KPI.SPEND_INFO'),
   },
@@ -514,7 +534,7 @@ onMounted(fetchUsage);
 
         <section class="p-5 border rounded-xl border-n-weak bg-n-solid-1">
           <h2 class="mb-4 text-sm font-medium text-n-slate-12">
-            {{ t('CRM_AI_USAGE.SECTIONS.WEEKLY_SPEND') }}
+            {{ periodSeriesLabel }}
           </h2>
           <p v-if="!hasTimeSeries" class="m-0 text-sm text-n-slate-11">
             {{ t('CRM_AI_USAGE.EMPTY.SERIES') }}

@@ -49,14 +49,21 @@ class Api::V1::Accounts::Crm::AiUsageController < Api::V1::Accounts::Crm::BaseCo
       payload.dig(:history, :rows).to_a.each do |row|
         csv << [
           row[:created_at],
-          row[:resource],
-          row.dig(:account, :name),
+          csv_safe(row[:resource]),
+          csv_safe(row.dig(:account, :name)),
           row[:total_tokens],
           row[:cost_usd],
           row[:cost_brl]
         ]
       end
     end
+  end
+
+  def csv_safe(value)
+    string = value.to_s
+    return string unless string.start_with?('=', '+', '-', '@', "\t", "\r")
+
+    "'#{string}"
   end
 
   def export_filename(extension)

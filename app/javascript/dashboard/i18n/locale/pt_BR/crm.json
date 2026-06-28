@@ -91,6 +91,11 @@
     },
     "KPI": {
       "SPEND": "Gasto na semana",
+      "SPEND_BY_PERIOD": {
+        "TODAY": "Gasto hoje",
+        "WEEK": "Gasto na semana",
+        "MONTH": "Gasto no mês"
+      },
       "SPEND_INFO": "Custo total da IA no período selecionado.",
       "USAGE": "Usos da IA",
       "USAGE_INFO": "Quantidade de usos da IA no período selecionado.",
@@ -102,6 +107,11 @@
     "SECTIONS": {
       "SPEND_BY_RESOURCE": "Gasto por recurso",
       "WEEKLY_SPEND": "Gasto na semana (por dia)",
+      "SPEND_BY_PERIOD": {
+        "TODAY": "Gasto hoje (por hora)",
+        "WEEK": "Gasto na semana (por dia)",
+        "MONTH": "Gasto no mês (por dia)"
+      },
       "HISTORY": "Histórico de uso"
     },
     "TABLE": {

@@ -29,24 +29,27 @@ RSpec.describe Crm::Ai::ExchangeRate do
       expect(result[:rate_unavailable]).to be(false)
     end
 
-    it 'uses a last-resort inline fetch and never raises when cache is empty' do
+    it 'returns rate_unavailable without HTTP when cache is empty' do
       stub_request(:get, described_class::API_URL)
-        .to_return(status: 200, body: { USDBRL: { bid: '5.4321', timestamp: '1782662400' } }.to_json)
-
-      result = described_class.current
-
-      expect(result[:rate]).to eq(BigDecimal('5.4321'))
-      expect(result[:inline]).to be(true)
-      expect(result[:rate_unavailable]).to be(false)
-      expect(cache.read(described_class::CURRENT_CACHE_KEY)).to be_nil
-    end
-
-    it 'returns rate_unavailable when cache and API fail' do
-      stub_request(:get, described_class::API_URL).to_timeout
+        .to_raise('should not be called')
 
       result = described_class.current
 
       expect(result).to eq(rate: nil, rate_unavailable: true)
+      expect(cache.read(described_class::CURRENT_CACHE_KEY)).to be_nil
+    end
+
+    it 'reads the cache populated by the refresh path' do
+      stub_request(:get, described_class::API_URL)
+        .to_return(status: 200, body: { USDBRL: { bid: '5.4321', timestamp: '1782662400' } }.to_json)
+
+      described_class.refresh!
+
+      result = described_class.current
+
+      expect(result[:rate]).to eq(BigDecimal('5.4321'))
+      expect(result[:rate_unavailable]).to be(false)
+      expect(result[:inline]).to be_nil
     end
   end
 

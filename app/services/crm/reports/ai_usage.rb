@@ -94,13 +94,8 @@ class Crm::Reports::AiUsage < Crm::Reports::BaseReport
   end
 
   def time_series
-    buckets = Hash.new(0.to_d)
-    usage_scope.select(:id, :created_at, :cost_estimate).find_each do |event|
-      buckets[bucket_time(event.created_at)] += event.cost_estimate.to_d
-    end
-
-    buckets.sort.map do |bucket, cost_usd|
-      { timestamp: bucket.iso8601 }.merge(money_payload(cost_usd))
+    usage_scope.group(bucket_expression).sum(:cost_estimate).sort_by { |bucket, _cost_usd| bucket.to_s }.map do |bucket, cost_usd|
+      { timestamp: bucket_timestamp(bucket) }.merge(money_payload(cost_usd))
     end
   end
 
@@ -137,8 +132,19 @@ class Crm::Reports::AiUsage < Crm::Reports::BaseReport
     @page ||= [params[:page].to_i, 1].max
   end
 
-  def bucket_time(time)
-    group_by == 'hour' ? time.beginning_of_hour : time.beginning_of_day
+  def bucket_expression
+    Arel.sql("date_trunc('#{group_by}', crm_ai_usage_events.created_at)")
+  end
+
+  def bucket_timestamp(bucket)
+    case bucket
+    when Time
+      bucket.utc.iso8601
+    when DateTime
+      bucket.to_time.utc.iso8601
+    else
+      Time.zone.parse(bucket.to_s).utc.iso8601
+    end
   end
 
   def cache_savings_usd

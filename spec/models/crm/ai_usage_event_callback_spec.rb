@@ -10,12 +10,11 @@ RSpec.describe Crm::AiUsageEvent, type: :model do
     expect(callback.instance_variable_get(:@if)).to be_present
   end
 
-  it 'delegates the post-commit broadcast to the usage broadcaster' do
-    event = build(:crm_ai_usage_event)
-    allow(Crm::Ai::UsageBroadcaster).to receive(:broadcast)
+  it 'enqueues the post-commit broadcast job' do
+    event = build_stubbed(:crm_ai_usage_event)
 
-    event.send(:broadcast_usage_created)
-
-    expect(Crm::Ai::UsageBroadcaster).to have_received(:broadcast).with(event)
+    expect do
+      event.send(:broadcast_usage_created)
+    end.to have_enqueued_job(Crm::Ai::UsageBroadcastJob).with(event.id).on_queue('low')
   end
 end

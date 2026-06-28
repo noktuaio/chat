@@ -10,7 +10,7 @@ class Crm::Ai::ExchangeRate
 
   class << self
     def current
-      cached_rate(CURRENT_CACHE_KEY) || cached_rate(LAST_CACHE_KEY) || inline_fallback
+      cached_rate(CURRENT_CACHE_KEY) || cached_rate(LAST_CACHE_KEY) || unavailable_payload
     end
 
     def refresh!
@@ -42,16 +42,6 @@ class Crm::Ai::ExchangeRate
     rescue StandardError => e
       Rails.logger.warn("[crm][ai][exchange_rate] cache read failed key=#{key}: #{e.class}: #{e.message}")
       nil
-    end
-
-    def inline_fallback
-      rate = fetch_rate
-      return unavailable_payload if rate.blank?
-
-      rate_payload(rate).merge(rate_unavailable: false, inline: true)
-    rescue StandardError => e
-      Rails.logger.warn("[crm][ai][exchange_rate] inline fallback failed: #{e.class}: #{e.message}")
-      unavailable_payload
     end
 
     def fetch_rate

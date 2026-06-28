@@ -58,6 +58,6 @@ class Crm::AiUsageEvent < ApplicationRecord
   private
 
   def broadcast_usage_created
-    Crm::Ai::UsageBroadcaster.broadcast(self)
+    Crm::Ai::UsageBroadcastJob.perform_later(id)
   end
 end
