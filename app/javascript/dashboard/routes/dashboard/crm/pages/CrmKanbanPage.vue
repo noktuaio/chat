@@ -1897,12 +1897,12 @@ onMounted(async () => {
 
     <section
       v-else-if="viewMode === 'kanban'"
-      class="flex flex-1 gap-4 overflow-x-auto overflow-y-hidden px-8 py-5"
+      class="flex flex-1 gap-4 overflow-x-auto overflow-y-hidden bg-n-slate-3 px-8 py-5"
     >
       <article
         v-for="stage in stages"
         :key="stage.id"
-        class="flex h-full min-w-[19rem] flex-1 flex-col overflow-hidden rounded-lg border border-n-weak bg-n-surface-2"
+        class="flex h-full w-[19rem] shrink-0 flex-col overflow-hidden rounded-lg border border-n-weak bg-n-surface-2 shadow-sm"
       >
         <header class="border-b border-n-weak px-4 py-3">
           <div class="flex items-start justify-between gap-3">
