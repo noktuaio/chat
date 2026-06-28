@@ -1902,7 +1902,7 @@ onMounted(async () => {
       <article
         v-for="stage in stages"
         :key="stage.id"
-        class="flex h-full w-[19rem] shrink-0 flex-col overflow-hidden rounded-lg border border-n-weak bg-n-surface-2"
+        class="flex h-full min-w-[19rem] flex-1 flex-col overflow-hidden rounded-lg border border-n-weak bg-n-surface-2"
       >
         <header class="border-b border-n-weak px-4 py-3">
           <div class="flex items-start justify-between gap-3">
