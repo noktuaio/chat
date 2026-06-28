@@ -1,3 +1,12 @@
+inherit_from: .rubocop_todo.yml
+
+# Merge (não sobrescrever) os arrays Exclude vindos do .rubocop_todo.yml com os
+# definidos abaixo. Sem isto, cops redefinidos aqui (Metrics/*, ClassAndModuleChildren,
+# Rails/InverseOf) descartam o grandfather do todo e os offenses legados voltam a falhar.
+inherit_mode:
+  merge:
+    - Exclude
+
 plugins:
   - rubocop-performance
   - rubocop-rails

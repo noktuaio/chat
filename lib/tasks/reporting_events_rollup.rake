@@ -90,7 +90,6 @@ class ReportingEventsRollupBackfill # rubocop:disable Metrics/ClassLength
     %w[y yes].include?(input)
   end
 
-  # rubocop:disable Metrics/ParameterLists
   def print_plan(account, timezone, start_date, end_date, total_days, first_event, last_event, dry_run)
     zone = ActiveSupport::TimeZone[timezone]
     print_plan_summary(account, timezone, start_date, end_date, total_days, zone, first_event, last_event, dry_run)
@@ -101,9 +100,8 @@ class ReportingEventsRollupBackfill # rubocop:disable Metrics/ClassLength
     puts "Would use account reporting_timezone '#{timezone}'"
     puts 'Run without dry run to execute backfill'
   end
-  # rubocop:enable Metrics/ParameterLists
 
-  def print_plan_summary(account, timezone, start_date, end_date, total_days, zone, first_event, last_event, dry_run) # rubocop:disable Metrics/ParameterLists
+  def print_plan_summary(account, timezone, start_date, end_date, total_days, zone, first_event, last_event, dry_run)
     puts color('=' * 70, :cyan)
     puts color('Backfill Plan Summary', :bold, :cyan)
     puts color('=' * 70, :cyan)

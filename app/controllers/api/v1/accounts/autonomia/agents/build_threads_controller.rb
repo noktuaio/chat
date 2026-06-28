@@ -1,6 +1,8 @@
 class Api::V1::Accounts::Autonomia::Agents::BuildThreadsController < Api::V1::Accounts::Autonomia::BaseController
   before_action :fetch_thread, only: [:show, :messages]
 
+  def show; end
+
   # Abre a conversa do Construtor e dispara a geração assíncrona em job (begin_build! gera o build_token;
   # o SubmitJob roda a chamada SÍNCRONA ao modelo em poucos segundos) e retorna 202. O front faz polling
   # pelo `show` até status ready/failed.
@@ -12,22 +14,18 @@ class Api::V1::Accounts::Autonomia::Agents::BuildThreadsController < Api::V1::Ac
     @thread.created_by = Current.user
     @thread.persist_start_options!(type: params[:type], actuation: params[:actuation], with_knowledge: params[:with_knowledge])
     @thread.save!
-    @thread.append_message!('user', params[:message], image_signed_ids: image_signed_ids_param,
-                                                       client_message_id: params[:client_message_id]) if params[:message].present?
+    append_user_message! if params[:message].present?
     persist_no_materials_flag
     persist_force_close_flag
     enqueue_build
     render :show, status: :accepted
   end
 
-  def show; end
-
   # Continua a conversa: empilha a mensagem do usuário e refaz a geração (novo build_token).
   def messages
     return render_unprocessable(I18n.t('autonomia.build_thread.message_blank')) if params[:message].blank?
 
-    @thread.append_message!('user', params[:message], image_signed_ids: image_signed_ids_param,
-                                                       client_message_id: params[:client_message_id])
+    append_user_message!
     persist_no_materials_flag
     persist_force_close_flag
     enqueue_build
@@ -35,6 +33,13 @@ class Api::V1::Accounts::Autonomia::Agents::BuildThreadsController < Api::V1::Ac
   end
 
   private
+
+  # Empilha a mensagem do usuário no turno atual (texto + imagens anexadas). Compartilhado por
+  # `create` (abertura com mensagem) e `messages` (continuação).
+  def append_user_message!
+    @thread.append_message!('user', params[:message], image_signed_ids: image_signed_ids_param,
+                                                      client_message_id: params[:client_message_id])
+  end
 
   # Portão de materiais (instrução-mãe §13): o front sinaliza `no_materials: true` quando o usuário
   # avança a etapa de materiais sem subir nada. Persistimos no jsonb `state` para o Builder liberar o

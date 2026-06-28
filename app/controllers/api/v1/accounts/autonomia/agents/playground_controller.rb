@@ -52,7 +52,7 @@ class Api::V1::Accounts::Autonomia::Agents::PlaygroundController < Api::V1::Acco
       .first(Autonomia::Agents::Config::MAX_IMAGES_PER_MESSAGE)
   end
 
-  IMAGE_DATA_URL_RE = %r{\Adata:(?<type>image/[a-z+]+);base64,(?<data>[A-Za-z0-9+/=\s]+)\z}.freeze
+  IMAGE_DATA_URL_RE = %r{\Adata:(?<type>image/[a-z+]+);base64,(?<data>[A-Za-z0-9+/=\s]+)\z}
 
   def valid_image_data_url(raw)
     match = IMAGE_DATA_URL_RE.match(raw)

@@ -39,6 +39,7 @@ class Api::V1::Accounts::Autonomia::AgentsController < Api::V1::Accounts::Autono
     @agent.assign_attributes(attrs.except(:config))
     merge_config!(attrs[:config]) if attrs.key?(:config)
     return if reject_internal_with_channels
+
     apply_manual_scaffold
     @agent.save!
     render :show
