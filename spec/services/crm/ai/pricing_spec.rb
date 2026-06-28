@@ -6,8 +6,9 @@ RSpec.describe Crm::Ai::Pricing do
       expect(described_class.rate('modelo-inexistente')).to eq(input: 0.0, cached: 0.0, output: 0.0)
     end
 
-    it 'returns the placeholder zero rate for the default known models' do
-      expect(described_class.rate('gpt-5.4')).to eq(input: 0.0, cached: 0.0, output: 0.0)
+    it 'returns the OpenAI table rate for the default known models' do
+      expect(described_class.rate('gpt-5.4')).to eq(input: 2.5, cached: 0.25, output: 15.0)
+      expect(described_class.rate('gpt-5.4-mini')).to eq(input: 0.75, cached: 0.075, output: 4.5)
     end
 
     it 'reads an ENV override normalizing the model into the price var name' do
@@ -24,8 +25,15 @@ RSpec.describe Crm::Ai::Pricing do
   end
 
   describe '.cost' do
-    it 'is zero when the rate is the placeholder zero' do
-      expect(described_class.cost(model: 'gpt-5.4', input_tokens: 1000, output_tokens: 500)).to eq(0.0)
+    it 'is zero for an unknown model with no ENV override' do
+      expect(described_class.cost(model: 'modelo-inexistente', input_tokens: 1000, output_tokens: 500)).to eq(0.0)
+    end
+
+    it 'uses the default table rate for a known model' do
+      # gpt-5.4: input 2.5, cached 0.25, output 15 (USD/1M)
+      # (1000*2.5 + 500*15) / 1_000_000 = 10000 / 1_000_000
+      cost = described_class.cost(model: 'gpt-5.4', input_tokens: 1000, output_tokens: 500)
+      expect(cost).to be_within(1e-9).of(0.01)
     end
 
     it 'charges cached tokens at the discounted rate and the remaining input at full rate' do
