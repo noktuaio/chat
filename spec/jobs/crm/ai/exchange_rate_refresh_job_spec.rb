@@ -13,7 +13,7 @@ RSpec.describe Crm::Ai::ExchangeRateRefreshJob, type: :job do
     cache = ActiveSupport::Cache::MemoryStore.new
     allow(Rails).to receive(:cache).and_return(cache)
     stub_request(:get, Crm::Ai::ExchangeRate::API_URL)
-      .to_return(status: 200, body: { USDBRL: { bid: '5.4321', timestamp: '1782662400' } }.to_json)
+      .to_return(status: 200, body: { result: 'success', rates: { BRL: 5.4321 } }.to_json)
 
     described_class.perform_now
 
