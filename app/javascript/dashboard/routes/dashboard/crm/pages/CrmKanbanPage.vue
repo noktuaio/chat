@@ -108,9 +108,6 @@ const selectedPipeline = computed(() =>
     pipeline => pipeline.id === Number(currentPipelineId.value)
   )
 );
-const loadedCardsCount = computed(() =>
-  stages.value.reduce((sum, stage) => sum + (stage.cards || []).length, 0)
-);
 
 const pipelineOptions = computed(() =>
   pipelines.value.map(pipeline => ({
@@ -216,10 +213,19 @@ const activeFilterChips = computed(() => {
       label: `${t('CRM_KANBAN.FILTERS.FOLLOW_UP')}: ${labelForOption(followUpStatusOptions, f.followUpStatus)}`,
     });
   }
-  if (f.result && viewMode.value === 'list') {
+  // 'open' is the default result (the "Em andamento" tab), so it is not a real
+  // active filter. Any other value — won/lost/archived OR '' ("Todos") — IS a
+  // deviation, so it must chip and be clearable; otherwise picking "Todos" in the
+  // popover would strand the list in a state the toolbar can't reset.
+  if (f.result !== 'open' && viewMode.value === 'list') {
+    // '' is the "Todos" (all statuses) option, which isn't in resultOptions.
+    const resultLabel =
+      f.result === ''
+        ? t('CRM_KANBAN.FILTERS.ALL')
+        : labelForOption(resultOptions, f.result);
     chips.push({
       key: 'result',
-      label: `${t('CRM_KANBAN.FILTERS.RESULT')}: ${labelForOption(resultOptions, f.result)}`,
+      label: `${t('CRM_KANBAN.FILTERS.RESULT')}: ${resultLabel}`,
     });
   }
   if (f.stageIds?.length) {
@@ -1443,13 +1449,6 @@ onMounted(async () => {
           :disabled="isLoading"
           @click="openCreatePipelineDrawer"
         />
-        <Button
-          v-if="canManageCards && viewMode !== 'calendar'"
-          :label="t('CRM_KANBAN.ACTIONS.NEW_CARD')"
-          icon="i-lucide-plus"
-          :disabled="!hasPipelines || isLoading"
-          @click="openCreateDrawer"
-        />
       </div>
     </header>
 
@@ -1458,7 +1457,7 @@ onMounted(async () => {
       class="flex flex-col gap-3 border-b border-n-weak px-8 py-4"
     >
       <!-- Single control row: pipeline picker + Edit pipeline + search + 2
-           high-frequency selects + Filters popover, with stage/card counts pushed
+           high-frequency selects + Filters popover + clear, with New card pushed
            to the right. Keeps the header band to just the title + global actions. -->
       <div class="flex flex-wrap items-end gap-3">
         <label v-if="viewMode !== 'calendar'" class="grid gap-1">
@@ -1795,25 +1794,22 @@ onMounted(async () => {
           v-if="activeFilterCount && viewMode !== 'calendar'"
           icon="i-lucide-x"
           slate
-          ghost
+          faded
           :title="t('CRM_KANBAN.ACTIONS.CLEAR_FILTERS')"
           @click="clearFilters"
         />
 
-        <!-- Live pipeline status, absorbed from the old meta row to save vertical space. -->
-        <div
-          v-if="selectedPipeline"
-          class="ml-auto flex h-10 items-center gap-3 text-xs text-n-slate-11"
-        >
-          <span>
-            {{ t('CRM_KANBAN.STATUS.STAGES_COUNT', { count: stages.length }) }}
-          </span>
-          <span>
-            {{
-              t('CRM_KANBAN.STATUS.CARDS_LOADED', { count: loadedCardsCount })
-            }}
-          </span>
-        </div>
+        <!-- New card sits at the right of the control row. With active filters the
+             row wraps and this button drops to the next line as a whole (never
+             splitting), thanks to flex-wrap + ml-auto. -->
+        <Button
+          v-if="canManageCards && viewMode !== 'calendar'"
+          class="ml-auto"
+          :label="t('CRM_KANBAN.ACTIONS.NEW_CARD')"
+          icon="i-lucide-plus"
+          :disabled="!hasPipelines || isLoading"
+          @click="openCreateDrawer"
+        />
       </div>
 
       <!-- Active-filter chips -->
