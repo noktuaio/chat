@@ -471,7 +471,7 @@ module Autonomia
         end
 
         def client
-          @client ||= Crm::Ai::ResponsesClient.new(credential: credential)
+          @client ||= Crm::Ai::ResponsesClient.new(credential: credential, feature: 'kb_revisao', account: @account)
         end
 
         def credential

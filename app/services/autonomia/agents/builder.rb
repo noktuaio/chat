@@ -1292,7 +1292,7 @@ module Autonomia
       end
 
       def client
-        @client ||= Crm::Ai::ResponsesClient.new(credential: credential)
+        @client ||= Crm::Ai::ResponsesClient.new(credential: credential, feature: 'agente_builder', account: @account)
       end
 
       def credential

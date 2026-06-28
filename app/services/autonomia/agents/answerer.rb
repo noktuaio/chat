@@ -111,7 +111,9 @@ module Autonomia
 
         pb = PromptBuilder.new(agent: @agent, query: @query, history: @history, snippets: snippets,
                                images: @images, audience: @audience)
-        raw = Crm::Ai::ResponsesClient.new(credential: credential).create(
+        raw = Crm::Ai::ResponsesClient.new(
+          credential: credential, feature: 'agente_resposta', account: @agent.account
+        ).create(
           model: Config::ANSWERER_MODEL,
           instructions: pb.instructions,
           input: pb.input,
