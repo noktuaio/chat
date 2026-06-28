@@ -395,6 +395,19 @@ const skeletonRows = Array.from({ length: 8 }, (_, i) => i);
 const visibleLeafColumns = computed(() => table.getVisibleLeafColumns());
 const colSpan = computed(() => visibleLeafColumns.value.length || 1);
 
+// Cumulative left offset (px) for a frozen/pinned column = sum of the widths of
+// the frozen columns before it. Without this, every frozen cell pinned to left:0
+// and stacked on top of the previous one, leaving their real column band uncovered
+// so horizontally-scrolled cells bled through.
+const frozenLeft = column => {
+  const cols = visibleLeafColumns.value;
+  const index = cols.findIndex(col => col.id === column.id);
+  return cols
+    .slice(0, index < 0 ? 0 : index)
+    .filter(isFrozen)
+    .reduce((sum, col) => sum + col.getSize(), 0);
+};
+
 /* -------------------------------------------------------------------------- */
 /* Keyboard grid navigation (roving tabindex)                                 */
 /* ArrowUp/Down move row focus, Enter opens the card, Esc clears selection.   */
@@ -554,16 +567,18 @@ const onRowKeydown = (event, card) => {
               scope="col"
               role="columnheader"
               :aria-sort="ariaSortFor(header.column)"
-              :style="{ width: `${header.getSize()}px` }"
+              :style="{
+                width: `${header.getSize()}px`,
+                ...(isFrozen(header.column)
+                  ? { left: `${frozenLeft(header.column)}px` }
+                  : {}),
+              }"
               class="relative border-b border-n-weak bg-n-alpha-black2 font-medium text-n-slate-11"
               :class="[
                 cellPadX,
                 cellPadY,
                 cellAlign(header.column),
-                isFrozen(header.column)
-                  ? 'sticky left-0 z-30 bg-n-surface-2'
-                  : '',
-                cellKind(header.column) === 'title' ? 'z-30' : '',
+                isFrozen(header.column) ? 'sticky z-30 bg-n-surface-2' : '',
               ]"
             >
               <!-- select header = page-level select-all checkbox -->
@@ -693,14 +708,19 @@ const onRowKeydown = (event, card) => {
                     v-for="cell in row.getVisibleCells()"
                     :key="cell.id"
                     role="gridcell"
-                    :style="{ width: `${cell.column.getSize()}px` }"
+                    :style="{
+                      width: `${cell.column.getSize()}px`,
+                      ...(isFrozen(cell.column)
+                        ? { left: `${frozenLeft(cell.column)}px` }
+                        : {}),
+                    }"
                     class="border-b border-n-weak align-middle"
                     :class="[
                       cellPadX,
                       cellPadY,
                       cellAlign(cell.column),
                       isFrozen(cell.column)
-                        ? 'sticky left-0 z-10 bg-n-surface-2 group-hover/row:bg-n-alpha-2'
+                        ? 'sticky z-10 bg-n-surface-2 group-hover/row:bg-n-solid-1'
                         : '',
                     ]"
                   >
@@ -790,28 +810,12 @@ const onRowKeydown = (event, card) => {
                     </span>
 
                     <span
-                      v-else-if="cellKind(cell.column) === 'enteredStage'"
-                      class="block truncate text-n-slate-11"
-                    >
-                      {{ relativeDate(row.original.entered_stage_at) }}
-                    </span>
-
-                    <span
                       v-else-if="cellKind(cell.column) === 'priority'"
                       class="block truncate text-n-slate-11"
                     >
                       {{
                         row.original.priority ||
                         t('CRM_KANBAN.DRAWER.EMPTY_VALUE')
-                      }}
-                    </span>
-
-                    <span
-                      v-else-if="cellKind(cell.column) === 'score'"
-                      class="block truncate text-right text-n-slate-11"
-                    >
-                      {{
-                        row.original.score ?? t('CRM_KANBAN.DRAWER.EMPTY_VALUE')
                       }}
                     </span>
 

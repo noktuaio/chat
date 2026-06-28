@@ -46,7 +46,6 @@ export const DEFAULT_COLUMN_ORDER = [
   'lastActivity',
   'inbox',
   'priority',
-  'score',
   'conversation',
 ];
 
@@ -63,7 +62,6 @@ export const DEFAULT_COLUMN_VISIBILITY = {
   lastActivity: false,
   inbox: true,
   priority: false,
-  score: false,
   conversation: false,
 };
 
@@ -81,7 +79,6 @@ const COLUMN_SIZES = {
   lastActivity: 150,
   inbox: 150,
   priority: 110,
-  score: 110,
   conversation: 140,
 };
 
@@ -244,20 +241,6 @@ export const buildCrmCardColumns = ({ t, stages = [], agents = [] } = {}) => {
       },
     },
     {
-      id: 'enteredStage',
-      accessorFn: dateAccessor('entered_stage_at'),
-      // hidden-by-default helper column kept available for sort wiring; not in
-      // DEFAULT_COLUMN_ORDER visible set but selectable via settings if exposed.
-      header: L('LAST_ACTIVITY'),
-      enableSorting: true,
-      enableHiding: true,
-      size: COLUMN_SIZES.lastActivity,
-      meta: {
-        kind: 'enteredStage',
-        sortParam: COLUMN_TO_SORT_PARAM.enteredStage,
-      },
-    },
-    {
       id: 'inbox',
       accessorFn: row => row?.inbox?.name || '',
       header: L('INBOX'),
@@ -272,14 +255,6 @@ export const buildCrmCardColumns = ({ t, stages = [], agents = [] } = {}) => {
       enableSorting: false,
       size: COLUMN_SIZES.priority,
       meta: { kind: 'priority' },
-    },
-    {
-      id: 'score',
-      accessorFn: row => row?.score,
-      header: L('SCORE'),
-      enableSorting: false,
-      size: COLUMN_SIZES.score,
-      meta: { kind: 'score', align: 'right' },
     },
     {
       id: 'conversation',
