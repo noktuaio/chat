@@ -5,7 +5,7 @@ require 'rails_helper'
 # guards against the most dangerous failure mode: if the OSS policies lack
 # prepend_mod_with (or the EE namespace is wrong) the whole granular layer
 # silently no-ops.
-RSpec.describe 'Crm Enterprise permission overlay', type: :policy, skip: 'QUARANTINE: pre-existing legacy EE-overlay failure (surfaces only under CI eager-load); real fix tracked for follow-up PR2' do
+RSpec.describe 'Crm Enterprise permission overlay', skip: 'QUARANTINE: legacy EE-overlay failure (PR2)', type: :policy do
   def policy_context(account, user, account_user = nil)
     {
       account: account,

@@ -294,7 +294,7 @@ RSpec.describe 'CRM cards API', type: :request do
     expect(payload['metadata']).not_to have_key('source_conversation')
   end
 
-  it 'sanitizes hidden primary conversation data from card index for agents', skip: 'QUARANTINE: pre-existing legacy failure (CI-only); real fix tracked for follow-up PR2' do
+  it 'sanitizes hidden primary conversation data from card index for agents', skip: 'QUARANTINE: legacy CI failure (PR2)' do
     account, admin = create_account_and_user
     agent, = create_crm_agent(account: account)
     hidden_inbox = create_crm_inbox(account: account)
@@ -517,7 +517,7 @@ RSpec.describe 'CRM cards API', type: :request do
     expect(cards.pluck('id')).not_to include(card.id)
   end
 
-  it 'includes linked conversation details in Kanban cards', skip: 'QUARANTINE: pre-existing legacy failure (CI-only); real fix tracked for follow-up PR2' do
+  it 'includes linked conversation details in Kanban cards', skip: 'QUARANTINE: legacy CI failure (PR2)' do
     account, user = create_account_and_user
     inbox = create_crm_inbox(account: account, members: [user])
     contact = account.contacts.create!(name: 'Lead com conversa', phone_number: '+5511987654321')
@@ -544,7 +544,7 @@ RSpec.describe 'CRM cards API', type: :request do
     expect(card_payload.dig('conversation', 'inbox_id')).to eq(inbox.id)
   end
 
-  it 'sanitizes hidden primary conversation data from Kanban cards for agents', skip: 'QUARANTINE: pre-existing legacy failure (CI-only); real fix tracked for follow-up PR2' do
+  it 'sanitizes hidden primary conversation data from Kanban cards for agents', skip: 'QUARANTINE: legacy CI failure (PR2)' do
     account, admin = create_account_and_user
     agent, = create_crm_agent(account: account)
     hidden_inbox = create_crm_inbox(account: account)
