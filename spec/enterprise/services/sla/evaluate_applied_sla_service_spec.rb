@@ -1,6 +1,7 @@
 require 'rails_helper'
 
-RSpec.describe Sla::EvaluateAppliedSlaService, skip: 'QUARANTINE: pre-existing legacy failure, harness-restore PR; real fix tracked for follow-up PR2' do
+RSpec.describe Sla::EvaluateAppliedSlaService,
+               skip: 'QUARANTINE: pre-existing legacy failure, harness-restore PR; real fix tracked for follow-up PR2' do
   let!(:account) { create(:account) }
   let!(:user_1) { create(:user, account: account) }
 
