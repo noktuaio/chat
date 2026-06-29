@@ -22,10 +22,14 @@ class Api::V1::Accounts::Crm::StagesController < Api::V1::Accounts::Crm::BaseCon
   end
 
   def destroy
-    return render_unprocessable('crm.stage_has_cards') if @stage.cards.exists?
-
-    @stage.destroy!
-    head :no_content
+    case Crm::PipelineStages::Destroyer.new(stage: @stage).perform
+    when Crm::PipelineStages::Destroyer::HAS_CARDS
+      render_unprocessable('crm.stage_has_cards')
+    when Crm::PipelineStages::Destroyer::LAST_STAGE
+      render_unprocessable('crm.stage_is_last')
+    else
+      head :no_content
+    end
   end
 
   def reorder

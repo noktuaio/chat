@@ -6,6 +6,10 @@ class Crm::PipelineStage < ApplicationRecord
 
   has_many :cards, class_name: 'Crm::Card', foreign_key: :stage_id, dependent: :restrict_with_error, inverse_of: :stage
   has_many :stage_automations, class_name: 'Crm::StageAutomation', foreign_key: :stage_id, dependent: :destroy
+  # AI suggestion rows are dangling history once the stage is gone (the columns are NOT NULL, so they
+  # cannot be nullified). Cascade-delete them so a stage the AI has touched stays deletable.
+  has_many :ai_suggestions_from, class_name: 'Crm::AiStageSuggestion', foreign_key: :from_stage_id, dependent: :delete_all, inverse_of: :from_stage
+  has_many :ai_suggestions_to, class_name: 'Crm::AiStageSuggestion', foreign_key: :to_stage_id, dependent: :delete_all, inverse_of: :to_stage
 
   validates :name, presence: true
   validates :position, numericality: { only_integer: true }
