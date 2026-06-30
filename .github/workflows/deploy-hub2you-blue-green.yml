@@ -4,6 +4,9 @@ on:
   pull_request_review:
     types:
       - submitted
+  pull_request:
+    types:
+      - closed
   workflow_dispatch:
     inputs:
       action:
@@ -52,7 +55,11 @@ jobs:
       (github.event_name == 'pull_request_review' &&
         github.event.review.state == 'approved' &&
         github.event.pull_request.base.ref == 'main' &&
-        github.event.pull_request.draft == false)
+        github.event.pull_request.draft == false) ||
+      (github.event_name == 'pull_request' &&
+        github.event.action == 'closed' &&
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.base.ref == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -60,7 +67,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.head.sha || github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: Log deployment trigger context
         run: |
@@ -515,7 +522,7 @@ jobs:
 
   rollback:
     name: Rollback To Previous Target Group
-    if: github.event.inputs.action == 'rollback'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
