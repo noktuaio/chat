@@ -54,9 +54,8 @@ module Crm
       end
 
       # Seleção de membro delegada ao Crm::Ai::HandoffMemberSelector (lógica
-      # extraída — round-robin/online/match por nome). Mesmo comportamento de antes,
-      # agora compartilhado com a Fase D (Operate::HandoffAssigner). Os parâmetros
-      # vêm do settings do estágio/pipeline e do handoff sugerido pela IA.
+      # extraída — round-robin/online/match por nome). Os parâmetros vêm do
+      # settings do estágio/pipeline e do handoff sugerido pela IA.
       def select_agent
         Crm::Ai::HandoffMemberSelector.new(
           inbox: @conversation.inbox,
@@ -69,7 +68,11 @@ module Crm
 
       def assign!(agent)
         ActiveRecord::Base.transaction do
-          @conversation.update!(assignee: agent)
+          # Caminho canônico de atribuição (mesmo do botão de atribuir da UI):
+          # seta assignee + zera assignee_agent_bot (cala o bot) num só ponto.
+          # NÃO é o motor round-robin nativo (auto_assignment v2) — quem decide o
+          # agente continua sendo o HandoffMemberSelector do CRM.
+          Conversations::AssignmentService.new(conversation: @conversation, assignee_id: agent.id).perform
           stamp_handoff_metadata!
           log_activity!(agent)
         end
