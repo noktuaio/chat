@@ -31,7 +31,7 @@ module CampaignImports
     end
 
     def parse_xlsx
-      rows = XlsxReader.new(read_source).rows
+      rows = CampaignImports::XlsxReader.new(read_source).rows
       headers = normalize_headers(rows.shift&.values || [])
       parsed_rows = rows.map do |row|
         ParsedRow.new(row_number: row.number, values: row.values)
