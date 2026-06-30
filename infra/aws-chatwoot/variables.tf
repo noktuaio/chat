@@ -123,6 +123,11 @@ variable "autonomia_auth_context_endpoint" {
   default = "https://auth.api-autonomia.com/me/context"
 }
 
+variable "autonomia_financial_api_base_url" {
+  type    = string
+  default = "https://financial.api-autonomia.com"
+}
+
 variable "autonomia_auth_client_id" {
   type    = string
   default = "talkai"

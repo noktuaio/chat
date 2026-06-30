@@ -69,6 +69,6 @@ class Autonomia::Financial::Client
   end
 
   def base_url
-    ENV.fetch('AUTONOMIA_FINANCIAL_API_BASE_URL', 'https://auth.api-autonomia.com')
+    ENV.fetch('AUTONOMIA_FINANCIAL_API_BASE_URL', 'https://financial.api-autonomia.com')
   end
 end
