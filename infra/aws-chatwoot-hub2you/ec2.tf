@@ -32,6 +32,7 @@ AUTONOMIA_AUTH_CONTEXT_ENDPOINT=${var.autonomia_auth_context_endpoint}
 AUTONOMIA_AUTH_ISSUER=${var.autonomia_auth_issuer}
 AUTONOMIA_AUTH_REDIRECT_URI=https://${var.domain_name}/auth/autonomia/callback
 AUTONOMIA_AUTH_TOKEN_ENDPOINT=${var.autonomia_auth_token_endpoint}
+AUTONOMIA_FINANCIAL_API_BASE_URL=${var.autonomia_financial_api_base_url}
 AUTONOMIA_SSO_AUTO_REDIRECT=${tostring(var.autonomia_sso_auto_redirect)}
 AUTONOMIA_SSO_ENABLED=${tostring(var.autonomia_sso_enabled)}
 AUTONOMIA_SSO_LOGOUT_URL=https://auth.autonomia.site/logout?client_id=${var.autonomia_auth_client_id}&post_logout_redirect_uri=https%3A%2F%2F${var.domain_name}%2Fauth%2Fautonomia%3Fprompt%3Dlogin
