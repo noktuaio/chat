@@ -24,7 +24,8 @@ module Crm
         agent = select_agent
         return skip('no_eligible_agent') if agent.blank?
 
-        assign!(agent)
+        return skip('assignment_failed') unless assign!(agent)
+
         Result.new(status: :handed_off, assignee: agent)
       end
 
@@ -66,18 +67,28 @@ module Crm
         ).perform
       end
 
+      # Retorna true só se a atribuição efetivou. A primitiva revalida o agente em
+      # account.users e devolve nil se ele não pertencer à conta (membro órfão/
+      # cross-account) — nesse caso NÃO grava metadata/log nem cala o bot (evita
+      # estado inconsistente: "passei pra Fulano" sem ter passado).
       def assign!(agent)
+        assigned = false
         ActiveRecord::Base.transaction do
           # Caminho canônico de atribuição (mesmo do botão de atribuir da UI):
           # seta assignee + zera assignee_agent_bot (cala o bot) num só ponto.
           # NÃO é o motor round-robin nativo (auto_assignment v2) — quem decide o
           # agente continua sendo o HandoffMemberSelector do CRM.
-          Conversations::AssignmentService.new(conversation: @conversation, assignee_id: agent.id).perform
+          assigned = Conversations::AssignmentService.new(conversation: @conversation, assignee_id: agent.id).perform.present?
+          raise ActiveRecord::Rollback unless assigned
+
           stamp_handoff_metadata!
           log_activity!(agent)
         end
+        return false unless assigned
+
         # Stop the AgentBot: transitions pending->open and signals handoff.
         @conversation.bot_handoff!
+        true
       end
 
       def stamp_handoff_metadata!
