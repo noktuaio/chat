@@ -27,6 +27,7 @@ class Account < ApplicationRecord
   include FlagShihTzu
   include Reportable
   include Featurable
+  include Autonomia::AccountProvisioningDefaults
   include CacheKeys
   include CaptainFeaturable
   include AccountEmailRateLimitable

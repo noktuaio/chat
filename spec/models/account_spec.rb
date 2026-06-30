@@ -18,6 +18,37 @@ RSpec.describe Account do
   it { is_expected.to have_many(:categories).dependent(:destroy_async) }
   it { is_expected.to have_many(:teams).dependent(:destroy_async) }
 
+  describe 'Autonomia provisioning defaults' do
+    let(:default_feature_flags) { 8_950_126_033_336_532_983 }
+
+    it 'applies the default feature flag bitmask when account defaults are enabled' do
+      with_modified_env AUTONOMIA_ACCOUNT_DEFAULTS_ENABLED: 'true' do
+        account = create(:account)
+
+        expect(account.feature_flags).to eq(default_feature_flags)
+      end
+    end
+
+    it 'links the configured default user as administrator when account defaults are enabled' do
+      user = create(:user)
+
+      with_modified_env AUTONOMIA_ACCOUNT_DEFAULTS_ENABLED: 'true',
+                        AUTONOMIA_DEFAULT_ACCOUNT_USER_ID: user.id.to_s do
+        account = create(:account)
+
+        account_user = AccountUser.find_by!(account: account, user: user)
+        expect(account_user.role).to eq('administrator')
+      end
+    end
+
+    it 'does not fail when the configured default user does not exist' do
+      with_modified_env AUTONOMIA_ACCOUNT_DEFAULTS_ENABLED: 'true',
+                        AUTONOMIA_DEFAULT_ACCOUNT_USER_ID: '-1' do
+        expect { create(:account) }.to change(Account, :count).by(1)
+      end
+    end
+  end
+
   it 'has_many autonomia_account_links' do
     skip 'QUARANTINE: pre-existing legacy failure, harness-restore PR; real fix tracked for follow-up PR2'
     expect(subject).to have_many(:autonomia_account_links).class_name('Autonomia::AccountLink').dependent(:destroy)
