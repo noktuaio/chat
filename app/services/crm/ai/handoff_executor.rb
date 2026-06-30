@@ -15,20 +15,30 @@ module Crm
       end
 
       def perform
-        return skip('not_requested') unless requested?
-        return skip('disabled') unless settings[:enabled]
-        return skip('no_conversation') if @conversation.blank?
-        return skip('already_assigned') if @conversation.assignee_id.present?
-        return skip('cooldown') if recently_handed_off?
+        blocked = blocked_reason
+        return skip(blocked) if blocked
 
         agent = select_agent
         return skip('no_eligible_agent') if agent.blank?
+        return skip('assignment_failed') unless assign!(agent)
 
-        assign!(agent)
         Result.new(status: :handed_off, assignee: agent)
       end
 
       private
+
+      # Primeira guarda que falha (ou nil se pode prosseguir). Idempotente/loop-safe:
+      # atribuir re-enfileira avaliação, então estas guardas têm de curto-circuitar antes
+      # de qualquer efeito colateral.
+      def blocked_reason
+        return 'not_requested' unless requested?
+        return 'disabled' unless settings[:enabled]
+        return 'no_conversation' if @conversation.blank?
+        return 'already_assigned' if @conversation.assignee_id.present?
+        return 'cooldown' if recently_handed_off?
+
+        nil
+      end
 
       def normalize(handoff)
         return {} if handoff.blank?
@@ -54,9 +64,8 @@ module Crm
       end
 
       # Seleção de membro delegada ao Crm::Ai::HandoffMemberSelector (lógica
-      # extraída — round-robin/online/match por nome). Mesmo comportamento de antes,
-      # agora compartilhado com a Fase D (Operate::HandoffAssigner). Os parâmetros
-      # vêm do settings do estágio/pipeline e do handoff sugerido pela IA.
+      # extraída — round-robin/online/match por nome). Os parâmetros vêm do
+      # settings do estágio/pipeline e do handoff sugerido pela IA.
       def select_agent
         Crm::Ai::HandoffMemberSelector.new(
           inbox: @conversation.inbox,
@@ -67,14 +76,28 @@ module Crm
         ).perform
       end
 
+      # Retorna true só se a atribuição efetivou. A primitiva revalida o agente em
+      # account.users e devolve nil se ele não pertencer à conta (membro órfão/
+      # cross-account) — nesse caso NÃO grava metadata/log nem cala o bot (evita
+      # estado inconsistente: "passei pra Fulano" sem ter passado).
       def assign!(agent)
+        assigned = false
         ActiveRecord::Base.transaction do
-          @conversation.update!(assignee: agent)
+          # Caminho canônico de atribuição (mesmo do botão de atribuir da UI):
+          # seta assignee + zera assignee_agent_bot (cala o bot) num só ponto.
+          # NÃO é o motor round-robin nativo (auto_assignment v2) — quem decide o
+          # agente continua sendo o HandoffMemberSelector do CRM.
+          assigned = Conversations::AssignmentService.new(conversation: @conversation, assignee_id: agent.id).perform.present?
+          raise ActiveRecord::Rollback unless assigned
+
           stamp_handoff_metadata!
           log_activity!(agent)
         end
+        return false unless assigned
+
         # Stop the AgentBot: transitions pending->open and signals handoff.
         @conversation.bot_handoff!
+        true
       end
 
       def stamp_handoff_metadata!

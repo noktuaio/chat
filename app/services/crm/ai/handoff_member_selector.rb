@@ -2,9 +2,8 @@ module Crm
   module Ai
     # Seletor de membro humano para handoff — lógica de seleção EXTRAÍDA (verbatim)
     # do HandoffExecutor (round-robin por carga de conversas abertas, preferência por
-    # online, match direto por nome sugerido pela IA). Fonte ÚNICA reusada pelo Kanban
-    # (HandoffExecutor#select_agent delega aqui) e pela Fase D dos Agentes Autonom.ia
-    # (Operate::HandoffAssigner, estratégia inbox_member).
+    # online, match direto por nome sugerido pela IA). Usado pelo Kanban
+    # (HandoffExecutor#select_agent delega aqui).
     #
     # Parâmetros:
     #   inbox          -> Inbox cujos membros formam o pool elegível
