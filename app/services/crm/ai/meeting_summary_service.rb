@@ -19,9 +19,9 @@ module Crm
       METADATA_KEY = 'ai_summary'.freeze
       METADATA_AT_KEY = 'ai_summary_at'.freeze
       MODEL = Crm::Ai::Config::MODEL_SUMMARY
-      # Fase 1 tuning: resumo de reunião usa 'xhigh' dedicado (NÃO o SUMMARY_REASONING_EFFORT
-      # compartilhado, p/ não afetar o resumo de card em ConversationSummarizer).
-      REASONING_EFFORT = 'xhigh'.freeze
+      # Resumo de reunião usa 'high' dedicado (NÃO o SUMMARY_REASONING_EFFORT compartilhado,
+      # p/ não afetar o resumo de card em ConversationSummarizer).
+      REASONING_EFFORT = 'high'.freeze
 
       SUMMARY_SCHEMA = {
         name: 'crm_meeting_summary',

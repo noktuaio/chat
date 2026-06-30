@@ -12,22 +12,20 @@ module Crm
 
       MODEL_SUMMARY = 'gpt-5.4-mini'.freeze
       MODEL_CLASSIFY = 'gpt-5.4-mini'.freeze
-      # Fase 1 tuning: auto-move usa o mini (custo) + effort xhigh (compensa força do modelo).
+      # auto-move usa o mini (custo) + effort high.
       MODEL_AUTO_MOVE = 'gpt-5.4-mini'.freeze
       MODEL_FOLLOWUP = 'gpt-5.4-mini'.freeze
       # E-mail builder copilot (multimodal generate). Full model — sees images/PDFs and writes MJML.
       MODEL_EMAIL = 'gpt-5.4'.freeze
 
-      # REASONING EFFORT por tarefa (modelos seguem mini). Decisões que FALAM com o cliente
-      # (follow-up composer + envio do callback) usam 'xhigh' — mais segurança, baixa frequência.
-      # Resumo/visão usam 'high'. Classify/auto-move usam 'xhigh' (auto-move age sem humano e o
-      # modelo é o mini — o effort máximo compensa). Effort único p/ classify E auto-move.
+      # REASONING EFFORT por tarefa (modelos seguem mini). Todas as features mini usam 'high':
+      # corte de custo (xhigh fatura muito mais token de raciocínio) sem trocar de modelo.
       # Suportados no gpt-5.4-mini: none/low/medium/high/xhigh (validado por probe no endpoint).
-      CLASSIFY_REASONING_EFFORT = 'xhigh'.freeze
+      CLASSIFY_REASONING_EFFORT = 'high'.freeze
       SUMMARY_REASONING_EFFORT = 'high'.freeze
       VISION_REASONING_EFFORT = 'high'.freeze
-      FOLLOWUP_REASONING_EFFORT = 'xhigh'.freeze
-      CALLBACK_REASONING_EFFORT = 'xhigh'.freeze
+      FOLLOWUP_REASONING_EFFORT = 'high'.freeze
+      CALLBACK_REASONING_EFFORT = 'high'.freeze
       # Per-PDF byte cap and per-request PDF count cap for the e-mail copilot (guards download/base64
       # of attached PDFs before they become input_file content parts).
       PDF_BYTE_LIMIT = 32_000_000

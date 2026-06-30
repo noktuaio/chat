@@ -29,7 +29,7 @@ module Crm
 
       RETRY_BACKOFF = 45.minutes
       # Após N falhas consecutivas (credencial quebrada / compose falhando), PARA de retransmitir
-      # (cada tentativa é um xhigh = custo) e cai para lembrete na tela. Espelha o budget do auto-followup.
+      # (cada tentativa é uma chamada de IA = custo) e cai para lembrete na tela. Espelha o budget do auto-followup.
       MAX_RETRIES = 3
 
       def initialize(follow_up:, now: Time.current)
@@ -64,7 +64,7 @@ module Crm
       private
 
       # Retry com TETO: abaixo de MAX_RETRIES reagenda (DueProcessor mantém pending + bump due_at);
-      # no teto desiste do envio e devolve :fallback (vira lembrete pro humano) — nunca retransmite xhigh infinito.
+      # no teto desiste do envio e devolve :fallback (vira lembrete pro humano) — nunca retransmite IA infinito.
       def fail_or_fallback(error)
         meta = base_metadata
         attempts = meta['callback_retries'].to_i + 1
