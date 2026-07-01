@@ -10,20 +10,26 @@ module Crm
     #   account_id     -> conta (para presença/online)
     #   mode           -> 'round_robin' (default) | 'direct' (tenta casar suggested_name)
     #   prefer_online  -> prioriza agentes online quando true (default true)
+    #   require_online -> restringe a seleção a agentes online quando true (default false)
     #   suggested_name -> nome sugerido pela IA (apenas em mode 'direct')
     #
     # Retorna User | nil (nil = sem membro elegível).
     class HandoffMemberSelector
-      def initialize(inbox:, account_id:, mode: 'round_robin', prefer_online: true, suggested_name: nil)
+      def initialize(inbox:, account_id:, mode: 'round_robin', prefer_online: true, require_online: false, suggested_name: nil)
         @inbox = inbox
         @account_id = account_id
         @mode = mode
         @prefer_online = prefer_online
+        @require_online = require_online
         @suggested_name = suggested_name
       end
 
       def perform
         select_agent
+      end
+
+      def held_for_online?
+        @require_online && eligible_members.present? && online_members.empty?
       end
 
       private
@@ -33,10 +39,11 @@ module Crm
       end
 
       # direct: assign to the agent the AI matched by name (must be an inbox
-      # member); fall back to round-robin if no match (stay flexible).
+      # member, and online when required); fall back to round-robin if no match (stay flexible).
       # round_robin: balanced pick, preferring online agents when configured.
       def select_agent
         return if eligible_members.empty?
+        return if held_for_online?
 
         if @mode == 'direct'
           matched = match_suggested_agent
@@ -49,11 +56,15 @@ module Crm
         name = @suggested_name.to_s.strip.downcase
         return if name.blank?
 
-        eligible_members.find { |user| user.name.to_s.strip.downcase == name } ||
-          eligible_members.find do |user|
+        search_pool.find { |user| user.name.to_s.strip.downcase == name } ||
+          search_pool.find do |user|
             member = user.name.to_s.downcase
             member.present? && (member.include?(name) || name.include?(member))
           end
+      end
+
+      def search_pool
+        @require_online ? preferred_pool : eligible_members
       end
 
       def round_robin_agent
@@ -62,13 +73,17 @@ module Crm
         pool.min_by { |user| counts[user.id] || 0 }
       end
 
-      # Prefer online agents; if none online (or presence not tracked), assign
-      # anyway — "pega quando entrar online" (locked decision).
+      # Prefer online agents; when online is required, keep only online agents.
+      # Otherwise, if none online (or presence not tracked), assign anyway.
       def preferred_pool
+        return online_members if @require_online
         return eligible_members unless @prefer_online
 
-        online = eligible_members.select { |user| online_agent_ids.include?(user.id) }
-        online.presence || eligible_members
+        online_members.presence || eligible_members
+      end
+
+      def online_members
+        @online_members ||= eligible_members.select { |user| online_agent_ids.include?(user.id) }
       end
 
       def online_agent_ids

@@ -18,9 +18,19 @@ module Crm
         blocked = blocked_reason
         return skip(blocked) if blocked
 
-        agent = select_agent
-        return skip('no_eligible_agent') if agent.blank?
-        return invite(agent) if invite_mode?
+        if invite_mode?
+          agent = select_agent(require_online: false)
+          return skip('no_eligible_agent') if agent.blank?
+
+          return invite(agent)
+        end
+
+        agent = select_agent(require_online: settings[:prefer_online])
+        if agent.blank?
+          return hold_online if held_for_online?
+
+          return skip('no_eligible_agent')
+        end
 
         return skip('assignment_failed') unless assign!(agent)
 
@@ -75,14 +85,20 @@ module Crm
       # Seleção de membro delegada ao Crm::Ai::HandoffMemberSelector (lógica
       # extraída — round-robin/online/match por nome). Os parâmetros vêm do
       # settings do estágio/pipeline e do handoff sugerido pela IA.
-      def select_agent
-        Crm::Ai::HandoffMemberSelector.new(
+      def select_agent(require_online:)
+        @member_selector = Crm::Ai::HandoffMemberSelector.new(
           inbox: @conversation.inbox,
           account_id: @card.account_id,
           mode: settings[:mode],
           prefer_online: settings[:prefer_online],
+          require_online: require_online,
           suggested_name: @handoff[:suggested_agent]
-        ).perform
+        )
+        @member_selector.perform
+      end
+
+      def held_for_online?
+        @member_selector&.held_for_online?
       end
 
       def invite_mode?
@@ -200,6 +216,10 @@ module Crm
 
       def skip(reason)
         Result.new(status: :skipped, error: reason)
+      end
+
+      def hold_online
+        Result.new(status: :held_online, error: 'no_online_agent')
       end
     end
   end

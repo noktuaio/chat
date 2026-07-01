@@ -385,6 +385,7 @@ Metrics/ParameterLists:
     - 'app/services/autonomia/agents/answerer.rb'
     - 'app/services/autonomia/agents/prompt_builder.rb'
     - 'app/services/crm/ai/follow_up_composer.rb'
+    - 'app/services/crm/ai/handoff_member_selector.rb'
     - 'app/services/crm/ai/responses_client.rb'
     - 'app/services/crm/ai/stage_classifier.rb'
     - 'app/services/crm/ai/suggest_meeting_time_service.rb'
