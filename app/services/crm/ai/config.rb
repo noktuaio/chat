@@ -128,6 +128,8 @@ module Crm
 
       # Don't re-hand-off the same conversation within this window (loop/spam guard).
       HANDOFF_COOLDOWN_SECONDS = 6 * 60 * 60
+      # TTL do convite R3: fecha ciclos esquecidos sem re-notificar nem escalar.
+      HANDOFF_INVITE_TTL_SECONDS = 24 * 60 * 60
       HANDOFF_MODES = %w[direct round_robin].freeze
       # Fluxo do handoff: r2_direct = atribui direto (comportamento legado);
       # r3_invite = convida (participante + notificação) sem atribuir/calar o bot.
@@ -145,8 +147,15 @@ module Crm
           mode: HANDOFF_MODES.include?(cfg['mode']) ? cfg['mode'] : 'round_robin',
           handoff_mode: HANDOFF_FLOW_MODES.include?(cfg['handoff_mode']) ? cfg['handoff_mode'] : 'r2_direct',
           trigger: cfg['trigger'].to_s.strip,
-          prefer_online: cfg.key?('prefer_online') ? BOOLEAN.cast(cfg['prefer_online']) : true
+          prefer_online: cfg.key?('prefer_online') ? BOOLEAN.cast(cfg['prefer_online']) : true,
+          invite_ttl_seconds: handoff_invite_ttl_seconds(cfg)
         }.with_indifferent_access
+      end
+
+      def self.handoff_invite_ttl_seconds(cfg)
+        raw = cfg['invite_ttl_seconds'].to_s.strip
+        parsed = raw.match?(/\A\d+\z/) ? raw.to_i : 0
+        parsed.positive? ? parsed : HANDOFF_INVITE_TTL_SECONDS
       end
     end
   end
