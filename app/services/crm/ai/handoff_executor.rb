@@ -90,20 +90,31 @@ module Crm
       end
 
       # R3: convida (participante + notificação), NÃO atribui, NÃO cala o bot. Grava
-      # invited_at (métrica de tempo-de-pega, PR2) e last_handoff_at (cooldown). Se o
-      # agente não puder participar da caixa, o convite falha e nada é gravado.
+      # um CICLO de convite (invited_at, métrica de tempo-de-pega, PR2) + last_handoff_at
+      # (cooldown). Se o agente não puder participar da caixa, o convite falha e nada é
+      # gravado.
+      #
+      # @card.with_lock (FOR UPDATE) serializa o append no JSONB: blocked_reason roda
+      # ANTES de qualquer lock, então dois avaliadores concorrentes poderiam passar
+      # ambos pela guarda de cooldown e sobrescrever o append um do outro (cycle_id
+      # duplicado / ciclo sem convite). Sob lock, recarrega metadata fresco e RE-checa
+      # cooldown — o 2º vira no-op limpo. Mesma salvaguarda do HandoffPickupRecorder.
       def invite(agent)
-        invited = false
-        ActiveRecord::Base.transaction do
+        outcome = nil
+        @card.with_lock do
+          if recently_handed_off?
+            outcome = skip('cooldown')
+            next
+          end
+
           invited = Crm::Ai::HandoffInviter.new(conversation: @conversation, agent: agent).perform
           raise ActiveRecord::Rollback unless invited
 
           stamp_handoff_metadata!(invited: true)
           log_activity!(agent, event_type: 'ai_handoff_invite')
+          outcome = Result.new(status: :invited, assignee: agent)
         end
-        return skip('invite_failed') unless invited
-
-        Result.new(status: :invited, assignee: agent)
+        outcome || skip('invite_failed')
       end
 
       # Retorna true só se a atribuição efetivou. A primitiva revalida o agente em
@@ -134,9 +145,43 @@ module Crm
         metadata = (@card.metadata || {}).deep_dup
         now = Time.current.iso8601
         ai = (metadata['ai'] || {}).merge('last_handoff_at' => now)
-        ai['handoff'] = (ai['handoff'] || {}).merge('invited_at' => now) if invited
+        ai = append_invite_cycle(ai, now) if invited
         metadata['ai'] = ai
         @card.update!(metadata: metadata)
+      end
+
+      # R3: cada convite é um CICLO. Mantém o histórico em ai['handoffs'] (lista) +
+      # um ponteiro ai['handoff'] p/ o ciclo ativo (retrocompat: PickupRecorder/UI
+      # leem o blob único). Um novo ciclo SUPERSEDE o anterior ainda aberto (marca
+      # canceled_at) — fecha o convite órfão SEM sobrescrever a métrica do ciclo
+      # anterior (U11: antes o 2º convite pisava em invited_at do 1º).
+      def append_invite_cycle(ai_meta, now)
+        cycles = supersede_open_cycles(normalized_cycles(ai_meta), now)
+        cycle = { 'cycle_id' => next_cycle_id(cycles), 'invited_at' => now }
+        ai_meta.merge('handoffs' => cycles + [cycle], 'handoff' => cycle)
+      end
+
+      # Semeia a lista a partir do blob legado (convite gravado antes do array) para
+      # não perder um convite em voo no 1º ciclo pós-deploy.
+      def normalized_cycles(ai_meta)
+        cycles = ai_meta['handoffs']
+        return cycles if cycles.is_a?(Array) && cycles.present?
+
+        legacy = ai_meta['handoff']
+        return [] if legacy.blank? || legacy['invited_at'].blank?
+
+        [legacy.merge('cycle_id' => 1)]
+      end
+
+      def supersede_open_cycles(cycles, now)
+        cycles.map do |cycle|
+          open = cycle['picked_up_at'].blank? && cycle['canceled_at'].blank?
+          open ? cycle.merge('canceled_at' => now) : cycle
+        end
+      end
+
+      def next_cycle_id(cycles)
+        (cycles.map { |cycle| cycle['cycle_id'].to_i }.max || 0) + 1
       end
 
       def log_activity!(agent, event_type: 'ai_handoff')

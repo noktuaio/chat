@@ -78,16 +78,51 @@ class Crm::Ai::HandoffPickupRecorder
     )
   end
 
+  # Carimba a pega no ciclo correspondente do array (mesmo cycle_id, senão o convite
+  # aberto por invited_at) SEM tocar nos ciclos anteriores — preserva o histórico por
+  # ciclo (U11). O ponteiro ai['handoff'] segue apontando p/ o ciclo ativo (retrocompat
+  # dos leitores do blob único). Cards legados (sem array) só atualizam o ponteiro.
   def stamp!(card, handoff, wall, business)
     metadata = (card.metadata || {}).deep_dup
-    merged = handoff.merge(
+    fields = pickup_fields(wall, business)
+    merged = handoff.merge(fields)
+    ai = metadata['ai'] || {}
+    ai['handoffs'] = stamp_cycle(ai['handoffs'], merged, fields)
+    ai['handoff'] = merged
+    metadata['ai'] = ai
+    card.update!(metadata: metadata)
+  end
+
+  def pickup_fields(wall, business)
+    {
       'picked_up_at' => @picked_up_at.iso8601,
       'picked_up_by' => @assignee_id,
       'pickup_seconds' => wall,
       'business_pickup_seconds' => business
-    )
-    metadata['ai'] = (metadata['ai'] || {}).merge('handoff' => merged)
-    card.update!(metadata: metadata)
+    }
+  end
+
+  # Atualiza só o ciclo casado (por cycle_id do ponteiro, senão o convite aberto de
+  # mesmo invited_at). Não achou/sem array → devolve como está (o ponteiro cobre o
+  # legado).
+  def stamp_cycle(cycles, merged, fields)
+    return cycles unless cycles.is_a?(Array)
+
+    matched = false
+    cycles.map do |cycle|
+      if !matched && cycle_matches?(cycle, merged)
+        matched = true
+        cycle.merge(fields)
+      else
+        cycle
+      end
+    end
+  end
+
+  def cycle_matches?(cycle, merged)
+    return cycle['cycle_id'] == merged['cycle_id'] if merged['cycle_id'].present?
+
+    cycle['invited_at'] == merged['invited_at'] && cycle['picked_up_at'].blank?
   end
 
   def log!(card, wall, business)
