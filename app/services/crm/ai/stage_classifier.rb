@@ -23,11 +23,17 @@ module Crm
               type: %w[object null],
               description: 'Preencha quando a conversa atender o gatilho de handoff informado. null caso contrário.',
               properties: {
-                should_handoff: { type: 'boolean', description: 'true se a conversa deve ser passada para um atendente humano agora.' },
+                intent: {
+                  type: 'string',
+                  enum: %w[continuar transferir consultar],
+                  description: 'Intenção do cliente quanto a falar com humano: "transferir" (quer assumir com atendente agora), ' \
+                               '"consultar" (dúvida pontual p/ especialista, sem assumir o atendimento) ou "continuar" (segue no atendimento normal).'
+                },
+                should_handoff: { type: 'boolean', description: 'true SOMENTE quando intent="transferir"; senão false.' },
                 reason: { type: 'string', maxLength: 300, description: 'Motivo curto do handoff.' },
                 suggested_agent: { type: %w[string null], description: 'Nome do agente citado/pedido na conversa, se houver; senão null.' }
               },
-              required: %w[should_handoff reason suggested_agent],
+              required: %w[intent should_handoff reason suggested_agent],
               additionalProperties: false
             },
             callback_request: {

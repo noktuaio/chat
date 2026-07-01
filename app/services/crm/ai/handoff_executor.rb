@@ -48,7 +48,14 @@ module Crm
         handoff.respond_to?(:with_indifferent_access) ? handoff.with_indifferent_access : handoff
       end
 
+      # Só "transferir" dispara o handoff. "consultar" fica em standby (fase 2) e
+      # "continuar" segue o atendimento — ambos NÃO atribuem/convidam. Fallback ao
+      # should_handoff legado enquanto respostas antigas (sem intent) circulam no rollout.
       def requested?
+        intent = @handoff[:intent].to_s
+        return true if intent == 'transferir'
+        return false if %w[continuar consultar].include?(intent)
+
         ActiveModel::Type::Boolean.new.cast(@handoff[:should_handoff])
       end
 

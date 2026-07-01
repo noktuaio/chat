@@ -57,9 +57,15 @@ module Crm::Ai::ClassifierPrompt
     HANDOFF PARA HUMANO: o status (handoff_enabled), o GATILHO (handoff_trigger) e os agentes disponíveis
     (eligible_agents) estão nos DADOS DE ENTRADA.
     Se handoff_enabled for false, retorne "handoff": null.
-    Se handoff_enabled for true, avalie se a conversa atende o handoff_trigger (quando vazio, use "o cliente pediu
-    explicitamente um atendente humano"): se atender, retorne "handoff" com should_handoff=true e um motivo curto;
-    senão should_handoff=false (ou "handoff": null).
+    Se handoff_enabled for true, classifique a INTENÇÃO do cliente quanto a falar com um humano no campo "intent":
+    - "transferir": o cliente quer/precisa que um atendente humano ASSUMA o atendimento agora, e a conversa atende
+      o handoff_trigger (quando o gatilho estiver vazio, use "o cliente pediu explicitamente um atendente humano").
+      NESTE E SOMENTE NESTE caso, should_handoff=true e preencha um motivo curto em "reason".
+    - "consultar": o cliente tem uma dúvida pontual que poderia precisar de um especialista, mas NÃO pede assumir o
+      atendimento (segue conversando com você). should_handoff=false.
+    - "continuar": o cliente segue no atendimento normal, sem pedir humano (padrão). should_handoff=false.
+    Na dúvida entre "consultar" e "transferir", só escolha "transferir" com pedido/necessidade CLARA de assumir;
+    caso contrário use "continuar". Se nada indicar handoff, retorne "handoff": null.
     Se o cliente citar/pedir um agente presente em eligible_agents, coloque o nome em "suggested_agent"; senão
     suggested_agent=null. Não invente nomes fora da lista.
   HANDOFF
