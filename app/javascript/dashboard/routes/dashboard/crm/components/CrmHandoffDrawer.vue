@@ -1,7 +1,8 @@
 <script setup>
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
+import { useMapGetter, useStore } from 'dashboard/composables/store';
 import Button from 'dashboard/components-next/button/Button.vue';
 import CrmKanbanAPI from 'dashboard/api/crmKanban';
 import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
@@ -15,9 +16,12 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 
 const { t } = useI18n();
+const store = useStore();
+const agents = useMapGetter('agents/getAgents');
 
 const SELECTOR_MODES = ['round_robin', 'direct'];
 const FLOW_MODES = ['r2_direct', 'r3_invite'];
+const HANDOFF_PICKUP_THRESHOLD_DEFAULT = 900;
 
 const isLoading = ref(false);
 const isSaving = ref(false);
@@ -29,11 +33,26 @@ const defaultHandoff = reactive({
   handoff_mode: 'r2_direct',
   trigger: '',
   prefer_online: true,
+  pickup_threshold_seconds: HANDOFF_PICKUP_THRESHOLD_DEFAULT,
+  escalation_user_id: null,
 });
 
 const stageForms = reactive({});
 
 const namedStages = () => props.stages.filter(stage => stage.id);
+const agentOptions = computed(() =>
+  agents.value.map(agent => ({ value: agent.id, label: agent.name }))
+);
+
+const normalizePositiveSeconds = value => {
+  const seconds = Number(value);
+  return seconds > 0 ? Math.round(seconds) : HANDOFF_PICKUP_THRESHOLD_DEFAULT;
+};
+
+const normalizeUserId = value => {
+  const userId = Number(value);
+  return Number.isInteger(userId) && userId > 0 ? userId : null;
+};
 
 const toFormEntry = handoff => ({
   enabled: handoff?.enabled === true,
@@ -43,7 +62,32 @@ const toFormEntry = handoff => ({
     : 'r2_direct',
   trigger: handoff?.trigger || '',
   prefer_online: handoff?.prefer_online !== false,
+  pickup_threshold_seconds: normalizePositiveSeconds(
+    handoff?.pickup_threshold_seconds
+  ),
+  escalation_user_id: normalizeUserId(handoff?.escalation_user_id),
 });
+
+const defaultPickupThresholdMinutes = computed({
+  get: () =>
+    Math.max(1, Math.round(defaultHandoff.pickup_threshold_seconds / 60)),
+  set: value => {
+    const minutes = Number(value);
+    defaultHandoff.pickup_threshold_seconds =
+      (minutes > 0 ? Math.round(minutes) : 1) * 60;
+  },
+});
+
+const pickupThresholdMinutes = form =>
+  Math.max(
+    1,
+    Math.round(normalizePositiveSeconds(form?.pickup_threshold_seconds) / 60)
+  );
+
+const updatePickupThresholdMinutes = (form, value) => {
+  const minutes = Number(value);
+  form.pickup_threshold_seconds = (minutes > 0 ? Math.round(minutes) : 1) * 60;
+};
 
 const loadSettings = async () => {
   if (!props.pipelineId) return;
@@ -96,6 +140,8 @@ const saveSettings = async () => {
               handoff_mode: form.handoff_mode,
               trigger: form.trigger,
               prefer_online: form.prefer_online,
+              pickup_threshold_seconds: form.pickup_threshold_seconds,
+              escalation_user_id: form.escalation_user_id,
             }
           : { custom: false },
       ])
@@ -115,7 +161,10 @@ const saveSettings = async () => {
 watch(
   () => [props.show, props.pipelineId],
   () => {
-    if (props.show) loadSettings();
+    if (props.show) {
+      store.dispatch('agents/get');
+      loadSettings();
+    }
   },
   { immediate: true }
 );
@@ -238,6 +287,39 @@ useKeyboardEvents({
                     class="rounded border-n-weak"
                   />
                   {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.PREFER_ONLINE') }}
+                </label>
+              </div>
+
+              <div
+                v-if="defaultHandoff.handoff_mode === 'r3_invite'"
+                class="flex flex-wrap items-center gap-4"
+              >
+                <label class="flex items-center gap-2 text-xs text-n-slate-11">
+                  {{ t('CRM_KANBAN.HANDOFF_DRAWER.PICKUP_THRESHOLD_MINUTES') }}
+                  <input
+                    v-model="defaultPickupThresholdMinutes"
+                    type="number"
+                    min="1"
+                    class="reset-base w-20 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
+                  />
+                </label>
+                <label class="flex items-center gap-2 text-xs text-n-slate-11">
+                  {{ t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER') }}
+                  <select
+                    v-model="defaultHandoff.escalation_user_id"
+                    class="reset-base max-w-52 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
+                  >
+                    <option :value="null">
+                      {{ t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER_NONE') }}
+                    </option>
+                    <option
+                      v-for="agent in agentOptions"
+                      :key="agent.value"
+                      :value="agent.value"
+                    >
+                      {{ agent.label }}
+                    </option>
+                  </select>
                 </label>
               </div>
             </template>
@@ -367,6 +449,53 @@ useKeyboardEvents({
                         class="rounded border-n-weak"
                       />
                       {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.PREFER_ONLINE') }}
+                    </label>
+                  </div>
+
+                  <div
+                    v-if="stageForms[stage.id].handoff_mode === 'r3_invite'"
+                    class="flex flex-wrap items-center gap-4"
+                  >
+                    <label
+                      class="flex items-center gap-2 text-xs text-n-slate-11"
+                    >
+                      {{
+                        t('CRM_KANBAN.HANDOFF_DRAWER.PICKUP_THRESHOLD_MINUTES')
+                      }}
+                      <input
+                        :value="pickupThresholdMinutes(stageForms[stage.id])"
+                        type="number"
+                        min="1"
+                        class="reset-base w-20 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
+                        @input="
+                          updatePickupThresholdMinutes(
+                            stageForms[stage.id],
+                            $event.target.value
+                          )
+                        "
+                      />
+                    </label>
+                    <label
+                      class="flex items-center gap-2 text-xs text-n-slate-11"
+                    >
+                      {{ t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER') }}
+                      <select
+                        v-model="stageForms[stage.id].escalation_user_id"
+                        class="reset-base max-w-52 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
+                      >
+                        <option :value="null">
+                          {{
+                            t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER_NONE')
+                          }}
+                        </option>
+                        <option
+                          v-for="agent in agentOptions"
+                          :key="agent.value"
+                          :value="agent.value"
+                        >
+                          {{ agent.label }}
+                        </option>
+                      </select>
                     </label>
                   </div>
                 </template>

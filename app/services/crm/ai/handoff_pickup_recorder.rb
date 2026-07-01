@@ -47,6 +47,7 @@ class Crm::Ai::HandoffPickupRecorder
       handoff = card_handoff(card)
       invited_at = parse_time(handoff['invited_at'])
       next if invited_at.blank?
+      next if handoff['escalated_at'].present?
 
       # Ciclo fechado (cancelado por novo convite ou expirado por TTL) não recebe
       # pega: atribuição depois do fechamento é ação nova, não pega daquele convite.

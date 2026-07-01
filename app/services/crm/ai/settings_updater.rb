@@ -95,6 +95,8 @@ module Crm
         result['handoff_mode'] = normalize_handoff_flow(cfg[:handoff_mode]) if cfg.key?(:handoff_mode)
         result['trigger'] = cfg[:trigger].to_s.strip if cfg.key?(:trigger)
         result['prefer_online'] = cast_boolean(cfg[:prefer_online], default: true) if cfg.key?(:prefer_online)
+        result['pickup_threshold_seconds'] = Config.handoff_pickup_threshold_seconds(cfg) if cfg.key?(:pickup_threshold_seconds)
+        result['escalation_user_id'] = Config.handoff_escalation_user_id(cfg) if cfg.key?(:escalation_user_id)
         result
       end
 
@@ -105,7 +107,9 @@ module Crm
           'mode' => normalize_handoff_selector(cfg[:mode]),
           'handoff_mode' => normalize_handoff_flow(cfg[:handoff_mode]),
           'trigger' => cfg[:trigger].to_s.strip,
-          'prefer_online' => cfg.key?(:prefer_online) ? cast_boolean(cfg[:prefer_online], default: true) : true
+          'prefer_online' => cfg.key?(:prefer_online) ? cast_boolean(cfg[:prefer_online], default: true) : true,
+          'pickup_threshold_seconds' => Config.handoff_pickup_threshold_seconds(cfg),
+          'escalation_user_id' => Config.handoff_escalation_user_id(cfg)
         }
       end
 

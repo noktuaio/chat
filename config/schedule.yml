@@ -132,6 +132,12 @@ crm_ai_auto_followup_scan_job:
   class: 'Crm::Ai::AutoFollowupScanJob'
   queue: scheduled_jobs
 
+# executed every 5 minutes; escalates expired CRM AI handoff invites.
+crm_ai_handoff_escalation_job:
+  cron: '*/5 * * * *'
+  class: 'Crm::Ai::HandoffEscalationJob'
+  queue: scheduled_jobs
+
 # executed hourly; refreshes cached USD->BRL rate for CRM AI usage reporting.
 crm_ai_exchange_rate_refresh_job:
   cron: '5 * * * *'
