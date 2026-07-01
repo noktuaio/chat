@@ -12,16 +12,29 @@ module Crm
     #   prefer_online  -> prioriza agentes online quando true (default true)
     #   require_online -> restringe a seleção a agentes online quando true (default false)
     #   suggested_name -> nome sugerido pela IA (apenas em mode 'direct')
+    #   pool_type      -> 'inbox' (default) | 'user' (restringe a um membro da inbox)
+    #   pool_id        -> id do usuário quando pool_type='user'
     #
     # Retorna User | nil (nil = sem membro elegível).
     class HandoffMemberSelector
-      def initialize(inbox:, account_id:, mode: 'round_robin', prefer_online: true, require_online: false, suggested_name: nil)
+      def initialize(
+        inbox:,
+        account_id:,
+        mode: 'round_robin',
+        prefer_online: true,
+        require_online: false,
+        suggested_name: nil,
+        pool_type: 'inbox',
+        pool_id: nil
+      )
         @inbox = inbox
         @account_id = account_id
         @mode = mode
         @prefer_online = prefer_online
         @require_online = require_online
         @suggested_name = suggested_name
+        @pool_type = pool_type
+        @pool_id = pool_id
       end
 
       def perform
@@ -35,7 +48,14 @@ module Crm
       private
 
       def eligible_members
-        @eligible_members ||= @inbox ? @inbox.members.to_a : []
+        @eligible_members ||= begin
+          members = @inbox ? @inbox.members.to_a : []
+          if @pool_type == 'user' && @pool_id.present?
+            members.select { |user| user.id == @pool_id }.presence || members
+          else
+            members
+          end
+        end
       end
 
       # direct: assign to the agent the AI matched by name (must be an inbox

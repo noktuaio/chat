@@ -7,9 +7,9 @@ class Crm::Ai::HandoffEscalationJob < ApplicationJob
     Crm::Pipeline.active.find_each do |pipeline|
       candidate_cards(pipeline).find_each do |card|
         settings = Crm::Ai::Config.handoff_settings(card.stage, card.pipeline)
-        next unless escalatable?(settings)
+        next unless actionable?(settings)
 
-        escalate(card, settings)
+        handle_action(card, settings)
       end
     end
   end
@@ -23,11 +23,19 @@ class Crm::Ai::HandoffEscalationJob < ApplicationJob
             .where("jsonb_array_length(metadata #> '{ai,handoffs}') > 0")
   end
 
-  def escalatable?(settings)
-    settings[:enabled] &&
-      settings[:handoff_mode] == 'r3_invite' &&
-      settings[:escalation_user_id].present? &&
-      settings[:pickup_threshold_seconds].to_i.positive?
+  def actionable?(settings)
+    return false unless settings[:enabled]
+    return false unless settings[:handoff_mode] == 'r3_invite'
+    return false unless settings[:pickup_threshold_seconds].to_i.positive?
+    return settings[:escalation_user_id].present? if settings[:escalation_action] == 'escalate'
+
+    settings[:escalation_action] == 'renotify'
+  end
+
+  def handle_action(card, settings)
+    return escalate(card, settings) if settings[:escalation_action] == 'escalate'
+
+    renotify(card, settings) if settings[:escalation_action] == 'renotify'
   end
 
   # Trava conversa→card (mesma ordem do drain) para serializar contra expiry/pickup/
@@ -45,7 +53,7 @@ class Crm::Ai::HandoffEscalationJob < ApplicationJob
 
   def escalate_locked(card, conversation, _settings)
     settings = Crm::Ai::Config.handoff_settings(card.stage, card.pipeline)
-    return unless card.open? && escalatable?(settings)
+    return unless locked_actionable?(card, settings, 'escalate')
     return if conversation.assignee_id.present?
 
     cycle = breached_open_cycle(card, settings[:pickup_threshold_seconds])
@@ -58,7 +66,87 @@ class Crm::Ai::HandoffEscalationJob < ApplicationJob
 
     conversation.bot_handoff!
     stamp_escalation!(card, cycle, user.id)
-    log_activity!(card, conversation, user.id, settings[:pickup_threshold_seconds])
+    log_activity!(
+      card,
+      conversation,
+      'ai_handoff_escalation',
+      assignee_id: user.id,
+      threshold_seconds: settings[:pickup_threshold_seconds].to_i
+    )
+  end
+
+  # R3 renotify: re-notifica o MESMO agente convidado (cycle['invited_agent_id']) quando
+  # o convite venceu o pickup_threshold e o escalation_action é 'renotify'. Não atribui,
+  # não cala o bot, não fecha o ciclo. Carimba renotified_at/renotify_count SOB LOCK
+  # (claim do slot) e notifica DEPOIS do lock — corrida concorrente relê fresh e cai no
+  # renotify_due? (renotified_at recém-gravado), sem notificação dupla.
+  def renotify(card, _settings)
+    conversation = card.primary_conversation
+    return if conversation.blank?
+
+    result = nil
+    conversation.with_lock do
+      card.with_lock { result = renotify_locked(card, conversation) }
+    end
+    return if result.blank?
+
+    notified = Crm::Ai::HandoffInviter.new(conversation: conversation, agent: result[:user]).perform
+    log_renotify_activity!(card, conversation, result) if notified
+  end
+
+  def renotify_locked(card, conversation)
+    settings = Crm::Ai::Config.handoff_settings(card.stage, card.pipeline)
+    return unless locked_actionable?(card, settings, 'renotify')
+
+    cycle = breached_open_cycle(card, settings[:pickup_threshold_seconds])
+    return unless renotifiable_cycle?(cycle, settings)
+
+    user = escalation_user(card, conversation, cycle['invited_agent_id'])
+    return if user.blank?
+
+    renotify_count = stamp_renotify!(card, cycle)
+    return if renotify_count.blank?
+
+    { user: user, renotify_count: renotify_count, threshold_seconds: settings[:pickup_threshold_seconds].to_i }
+  end
+
+  def renotifiable_cycle?(cycle, settings)
+    cycle.present? && renotify_due?(cycle, settings) && renotify_cap_available?(cycle)
+  end
+
+  def renotify_due?(cycle, settings)
+    last_touch = parse_time(cycle['renotified_at']) || parse_time(cycle['invited_at'])
+    last_touch.present? && last_touch <= settings[:renotify_after_seconds].to_i.seconds.ago
+  end
+
+  def renotify_cap_available?(cycle)
+    cycle['renotify_count'].to_i < Crm::Ai::Config::HANDOFF_RENOTIFY_MAX
+  end
+
+  def stamp_renotify!(card, cycle)
+    renotify_count = cycle['renotify_count'].to_i + 1
+    stamped = stamp_handoff_cycle!(
+      card,
+      cycle,
+      'renotified_at' => Time.current.iso8601,
+      'renotify_count' => renotify_count
+    )
+    stamped ? renotify_count : nil
+  end
+
+  def log_renotify_activity!(card, conversation, result)
+    log_activity!(
+      card,
+      conversation,
+      'ai_handoff_renotify',
+      assignee_id: result[:user].id,
+      renotify_count: result[:renotify_count],
+      threshold_seconds: result[:threshold_seconds]
+    )
+  end
+
+  def locked_actionable?(card, settings, action)
+    card.open? && settings[:escalation_action] == action && actionable?(settings)
   end
 
   def breached_open_cycle(card, threshold_seconds)
@@ -101,15 +189,20 @@ class Crm::Ai::HandoffEscalationJob < ApplicationJob
   end
 
   def stamp_escalation!(card, cycle, user_id)
+    stamp_handoff_cycle!(
+      card,
+      cycle,
+      'escalated_at' => Time.current.iso8601,
+      'escalated_to' => user_id
+    )
+  end
+
+  def stamp_handoff_cycle!(card, cycle, fields)
     metadata = (card.metadata || {}).deep_dup
     ai = metadata['ai'] || {}
     cycles = ai['handoffs']
     return unless cycles.is_a?(Array)
 
-    fields = {
-      'escalated_at' => Time.current.iso8601,
-      'escalated_to' => user_id
-    }
     updated_cycles, matched = stamp_cycle(cycles, cycle, fields)
     return unless matched
 
@@ -145,16 +238,13 @@ class Crm::Ai::HandoffEscalationJob < ApplicationJob
     stored_cycle['invited_at'] == cycle['invited_at']
   end
 
-  def log_activity!(card, conversation, user_id, threshold_seconds)
+  def log_activity!(card, conversation, event_type, payload)
     Crm::ActivityLogger.new(
       card: card,
       actor: nil,
-      event_type: 'ai_handoff_escalation',
+      event_type: event_type,
       conversation: conversation,
-      payload: {
-        assignee_id: user_id,
-        threshold_seconds: threshold_seconds.to_i
-      }
+      payload: payload
     ).perform
   end
 

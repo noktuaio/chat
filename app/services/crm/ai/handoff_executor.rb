@@ -91,10 +91,12 @@ module Crm
         @member_selector = Crm::Ai::HandoffMemberSelector.new(
           inbox: @conversation.inbox,
           account_id: @card.account_id,
-          mode: settings[:mode],
+          mode: settings[:selector_mode],
           prefer_online: settings[:prefer_online],
           require_online: require_online,
-          suggested_name: @handoff[:suggested_agent]
+          suggested_name: @handoff[:suggested_agent],
+          pool_type: settings[:pool_type],
+          pool_id: settings[:pool_id]
         )
         @member_selector.perform
       end
@@ -128,7 +130,7 @@ module Crm
           invited = Crm::Ai::HandoffInviter.new(conversation: @conversation, agent: agent).perform
           raise ActiveRecord::Rollback unless invited
 
-          stamp_handoff_metadata!(invited: true)
+          stamp_handoff_metadata!(invited: true, invited_agent: agent)
           log_activity!(agent, event_type: 'ai_handoff_invite')
           outcome = Result.new(status: :invited, assignee: agent)
         end
@@ -159,12 +161,12 @@ module Crm
         true
       end
 
-      def stamp_handoff_metadata!(invited: false)
+      def stamp_handoff_metadata!(invited: false, invited_agent: nil)
         metadata = (@card.metadata || {}).deep_dup
         now = Time.current.iso8601
         ai = (metadata['ai'] || {}).merge('last_handoff_at' => now)
         ai.delete('handoff_hold')
-        ai = append_invite_cycle(ai, now) if invited
+        ai = append_invite_cycle(ai, now, invited_agent) if invited
         metadata['ai'] = ai
         @card.update!(metadata: metadata)
       end
@@ -174,9 +176,9 @@ module Crm
       # leem o blob único). Um novo ciclo SUPERSEDE o anterior ainda aberto (marca
       # canceled_at) — fecha o convite órfão SEM sobrescrever a métrica do ciclo
       # anterior (U11: antes o 2º convite pisava em invited_at do 1º).
-      def append_invite_cycle(ai_meta, now)
+      def append_invite_cycle(ai_meta, now, agent)
         cycles = supersede_open_cycles(normalized_cycles(ai_meta), now)
-        cycle = { 'cycle_id' => next_cycle_id(cycles), 'invited_at' => now }
+        cycle = { 'cycle_id' => next_cycle_id(cycles), 'invited_at' => now, 'invited_agent_id' => agent.id }
         # O ponteiro sempre referencia o ciclo recém-criado; manter a cauda preserva
         # esse ciclo e descarta apenas histórico antigo já fora da janela operacional.
         capped_cycles = (cycles + [cycle]).last(HANDOFF_CYCLES_CAP)

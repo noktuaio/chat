@@ -5,6 +5,26 @@ Repo vivo: `chat2you` (deploy blue-green). Snapshot de referência: `chatwoot_cu
 
 ---
 
+## 0. Reconstrução do drawer — plano reaprovado 2026-07-01
+
+Lote C peça 1 já em prod (PR #72 backend + #73 i18n stopgap): drawer funcional mas divergente do mockup (só `round_robin|direct`, sem banner, sem pessoa-específica). Esta é a reconstrução pro mockup aprovado.
+
+**Decisões travadas (Rodrigo, 2026-07-01):**
+- Persistência: **só `card.metadata`** — sem tabela `crm_ai_handoffs` no MVP (revisita §142 se drain/telemetria durável exigir).
+- Pool de atribuição MVP: **pessoa específica + caixa inteira** (Team fica pra depois).
+
+**Schema (expandir `Config.handoff_settings`, sem migration):** `selector_mode` (alias legado de `mode`), `pool_type` (`inbox|user`), `pool_id`, `renotify_after_seconds`, `escalation_action` (`renotify|escalate`). Config antiga sem campos → default atual (zero regressão).
+
+**PRs (cada um com Codex antes de merge; deploy só com OK):**
+- **PR A** backend schema + `HandoffMemberSelector` pool por pessoa/caixa + specs (no-op visual em prod).
+- **PR B** backend runtime: `renotify_after_seconds` + `escalation_action` nos jobs expiry/escalation (guarda: `escalate` sem `escalation_user_id` → cai em `renotify`); fonte do banner lê `card.metadata['ai']['handoff']` + specs.
+- **PR C** frontend: reescreve `CrmHandoffDrawer.vue` no shell padrão dos drawers de card — chip picker, toggle online+hint, segmented re-notificar/escalar, banner "último handoff há X min úteis · aguardando Y", i18n pt_BR + en.json completos.
+- **Lote D** E2E (nunca feito na épica): regra → convite → pega/renotify/escala.
+
+Mockup de referência: gerado nesta sessão (widget `handoff_drawer_redesign_mockup`).
+
+---
+
 ## 1. Problema (a dor real)
 
 Quando a IA decide passar a conversa pra um humano, o handoff atual é um **alçapão só-ida**: ele atribui na hora e **cala o bot**, de forma irreversível, baseado em UMA mensagem. Se o cliente logo depois diz *"tudo bem, mas quero continuar aqui e fazer uma cotação"*, ninguém responde:

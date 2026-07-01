@@ -132,6 +132,9 @@ module Crm
       HANDOFF_INVITE_TTL_SECONDS = 24 * 60 * 60
       HANDOFF_PICKUP_THRESHOLD_SECONDS = 15 * 60
       HANDOFF_MODES = %w[direct round_robin].freeze
+      HANDOFF_POOL_TYPES = %w[inbox user].freeze
+      HANDOFF_ESCALATION_ACTIONS = %w[renotify escalate].freeze
+      HANDOFF_RENOTIFY_MAX = 8
       # Fluxo do handoff: r2_direct = atribui direto (comportamento legado);
       # r3_invite = convida (participante + notificação) sem atribuir/calar o bot.
       HANDOFF_FLOW_MODES = %w[r2_direct r3_invite].freeze
@@ -143,17 +146,38 @@ module Crm
         pipeline_cfg = pipeline_ai_settings(pipeline).fetch('handoff', {}).to_h
         stage_cfg = (stage&.metadata || {}).fetch('ai_handoff', {}).to_h
         cfg = pipeline_cfg.merge(stage_cfg)
+        mode = handoff_selector(cfg)
+        pickup_threshold_seconds = handoff_pickup_threshold_seconds(cfg)
+        escalation_user_id = handoff_escalation_user_id(cfg)
+        legacy_handoff_settings(cfg, mode, pickup_threshold_seconds, escalation_user_id)
+          .merge(pool_handoff_settings(cfg, pickup_threshold_seconds, escalation_user_id))
+          .with_indifferent_access
+      end
+
+      def self.legacy_handoff_settings(cfg, mode, pickup_threshold_seconds, escalation_user_id)
         {
           enabled: BOOLEAN.cast(cfg['enabled']),
-          mode: HANDOFF_MODES.include?(cfg['mode']) ? cfg['mode'] : 'round_robin',
+          mode: mode,
+          selector_mode: handoff_selector_mode(cfg, mode),
           handoff_mode: HANDOFF_FLOW_MODES.include?(cfg['handoff_mode']) ? cfg['handoff_mode'] : 'r2_direct',
           trigger: cfg['trigger'].to_s.strip,
           prefer_online: cfg.key?('prefer_online') ? BOOLEAN.cast(cfg['prefer_online']) : true,
           invite_ttl_seconds: handoff_invite_ttl_seconds(cfg),
-          pickup_threshold_seconds: handoff_pickup_threshold_seconds(cfg),
-          escalation_user_id: handoff_escalation_user_id(cfg)
-        }.with_indifferent_access
+          pickup_threshold_seconds: pickup_threshold_seconds,
+          escalation_user_id: escalation_user_id
+        }
       end
+      private_class_method :legacy_handoff_settings
+
+      def self.pool_handoff_settings(cfg, pickup_threshold_seconds, escalation_user_id)
+        {
+          pool_type: handoff_pool_type(cfg),
+          pool_id: handoff_pool_id(cfg),
+          renotify_after_seconds: handoff_renotify_after_seconds(cfg, pickup_threshold_seconds),
+          escalation_action: handoff_escalation_action(cfg, escalation_user_id)
+        }
+      end
+      private_class_method :pool_handoff_settings
 
       def self.handoff_invite_ttl_seconds(cfg)
         raw = cfg['invite_ttl_seconds'].to_s.strip
@@ -177,6 +201,53 @@ module Crm
         user_id = value.to_i
         user_id.positive? ? user_id : nil
       end
+
+      def self.handoff_selector(cfg)
+        HANDOFF_MODES.include?(cfg['mode']) ? cfg['mode'] : 'round_robin'
+      end
+      private_class_method :handoff_selector
+
+      def self.handoff_selector_mode(cfg, mode)
+        HANDOFF_MODES.include?(cfg['selector_mode']) ? cfg['selector_mode'] : mode
+      end
+      private_class_method :handoff_selector_mode
+
+      def self.handoff_pool_type(cfg)
+        HANDOFF_POOL_TYPES.include?(cfg['pool_type']) ? cfg['pool_type'] : 'inbox'
+      end
+      private_class_method :handoff_pool_type
+
+      def self.handoff_pool_id(cfg)
+        value = cfg['pool_id']
+        return value if value.is_a?(Integer) && value.positive?
+        return unless value.is_a?(String) && value.match?(/\A\d+\z/)
+
+        pool_id = value.to_i
+        pool_id.positive? ? pool_id : nil
+      end
+      private_class_method :handoff_pool_id
+
+      def self.handoff_renotify_after_seconds(cfg, fallback)
+        value = cfg['renotify_after_seconds']
+        return fallback unless value.to_s.match?(/\A\d+\z/)
+
+        seconds = value.to_i
+        seconds.positive? ? seconds : fallback
+      end
+      private_class_method :handoff_renotify_after_seconds
+
+      def self.handoff_escalation_action(cfg, escalation_user_id)
+        action = if HANDOFF_ESCALATION_ACTIONS.include?(cfg['escalation_action'])
+                   cfg['escalation_action']
+                 else
+                   default_escalation_action(escalation_user_id)
+                 end
+        action == 'escalate' && escalation_user_id.blank? ? 'renotify' : action
+      end
+      private_class_method :handoff_escalation_action
+
+      def self.default_escalation_action(escalation_user_id) = escalation_user_id.present? ? 'escalate' : 'renotify'
+      private_class_method :default_escalation_action
     end
   end
 end

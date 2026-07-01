@@ -97,20 +97,36 @@ module Crm
         result['prefer_online'] = cast_boolean(cfg[:prefer_online], default: true) if cfg.key?(:prefer_online)
         result['pickup_threshold_seconds'] = Config.handoff_pickup_threshold_seconds(cfg) if cfg.key?(:pickup_threshold_seconds)
         result['escalation_user_id'] = Config.handoff_escalation_user_id(cfg) if cfg.key?(:escalation_user_id)
+        result['pool_type'] = normalize_handoff_pool_type(cfg[:pool_type]) if cfg.key?(:pool_type)
+        result['pool_id'] = normalize_positive_integer(cfg[:pool_id]) if cfg.key?(:pool_id)
+        result['escalation_action'] = normalize_handoff_escalation_action(cfg[:escalation_action]) if cfg.key?(:escalation_action)
+        if cfg.key?(:renotify_after_seconds)
+          renotify_after_seconds = normalize_positive_integer(cfg[:renotify_after_seconds])
+          renotify_after_seconds ? result['renotify_after_seconds'] = renotify_after_seconds : result.delete('renotify_after_seconds')
+        end
         result
       end
 
       def normalized_handoff_defaults(existing)
         cfg = (existing || {}).to_h.with_indifferent_access
-        {
+        result = {
           'enabled' => cast_boolean(cfg[:enabled], default: false),
+          # selector_mode is a read-time alias of `mode` (Config.handoff_selector_mode
+          # mirrors mode when absent); persisting it separately would let it drift from
+          # mode and silently override the selector on save. So we never store it.
           'mode' => normalize_handoff_selector(cfg[:mode]),
           'handoff_mode' => normalize_handoff_flow(cfg[:handoff_mode]),
           'trigger' => cfg[:trigger].to_s.strip,
           'prefer_online' => cfg.key?(:prefer_online) ? cast_boolean(cfg[:prefer_online], default: true) : true,
           'pickup_threshold_seconds' => Config.handoff_pickup_threshold_seconds(cfg),
-          'escalation_user_id' => Config.handoff_escalation_user_id(cfg)
+          'escalation_user_id' => Config.handoff_escalation_user_id(cfg),
+          'pool_type' => normalize_handoff_pool_type(cfg[:pool_type]),
+          'pool_id' => normalize_positive_integer(cfg[:pool_id]),
+          'escalation_action' => normalize_handoff_escalation_action(cfg[:escalation_action])
         }
+        renotify_after_seconds = normalize_positive_integer(cfg[:renotify_after_seconds])
+        result['renotify_after_seconds'] = renotify_after_seconds if renotify_after_seconds
+        result
       end
 
       def normalize_handoff_selector(value)
@@ -119,6 +135,22 @@ module Crm
 
       def normalize_handoff_flow(value)
         Config::HANDOFF_FLOW_MODES.include?(value) ? value : 'r2_direct'
+      end
+
+      def normalize_handoff_pool_type(value)
+        Config::HANDOFF_POOL_TYPES.include?(value) ? value : 'inbox'
+      end
+
+      def normalize_handoff_escalation_action(value)
+        Config::HANDOFF_ESCALATION_ACTIONS.include?(value) ? value : 'renotify'
+      end
+
+      def normalize_positive_integer(value)
+        return value if value.is_a?(Integer) && value.positive?
+        return unless value.is_a?(String) && value.match?(/\A\d+\z/)
+
+        parsed = value.to_i
+        parsed.positive? ? parsed : nil
       end
 
       def cast_boolean(value, default:)

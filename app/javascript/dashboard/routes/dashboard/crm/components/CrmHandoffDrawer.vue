@@ -6,6 +6,7 @@ import { useMapGetter, useStore } from 'dashboard/composables/store';
 import Button from 'dashboard/components-next/button/Button.vue';
 import CrmKanbanAPI from 'dashboard/api/crmKanban';
 import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
+import CrmHandoffFields from './CrmHandoffFields.vue';
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -21,6 +22,8 @@ const agents = useMapGetter('agents/getAgents');
 
 const SELECTOR_MODES = ['round_robin', 'direct'];
 const FLOW_MODES = ['r2_direct', 'r3_invite'];
+const POOL_TYPES = ['inbox', 'user'];
+const ESCALATION_ACTIONS = ['renotify', 'escalate'];
 const HANDOFF_PICKUP_THRESHOLD_DEFAULT = 900;
 
 const isLoading = ref(false);
@@ -35,6 +38,9 @@ const defaultHandoff = reactive({
   prefer_online: true,
   pickup_threshold_seconds: HANDOFF_PICKUP_THRESHOLD_DEFAULT,
   escalation_user_id: null,
+  pool_type: 'inbox',
+  pool_id: null,
+  escalation_action: 'renotify',
 });
 
 const stageForms = reactive({});
@@ -66,28 +72,14 @@ const toFormEntry = handoff => ({
     handoff?.pickup_threshold_seconds
   ),
   escalation_user_id: normalizeUserId(handoff?.escalation_user_id),
+  pool_type: POOL_TYPES.includes(handoff?.pool_type)
+    ? handoff.pool_type
+    : 'inbox',
+  pool_id: normalizeUserId(handoff?.pool_id),
+  escalation_action: ESCALATION_ACTIONS.includes(handoff?.escalation_action)
+    ? handoff.escalation_action
+    : 'renotify',
 });
-
-const defaultPickupThresholdMinutes = computed({
-  get: () =>
-    Math.max(1, Math.round(defaultHandoff.pickup_threshold_seconds / 60)),
-  set: value => {
-    const minutes = Number(value);
-    defaultHandoff.pickup_threshold_seconds =
-      (minutes > 0 ? Math.round(minutes) : 1) * 60;
-  },
-});
-
-const pickupThresholdMinutes = form =>
-  Math.max(
-    1,
-    Math.round(normalizePositiveSeconds(form?.pickup_threshold_seconds) / 60)
-  );
-
-const updatePickupThresholdMinutes = (form, value) => {
-  const minutes = Number(value);
-  form.pickup_threshold_seconds = (minutes > 0 ? Math.round(minutes) : 1) * 60;
-};
 
 const loadSettings = async () => {
   if (!props.pipelineId) return;
@@ -125,6 +117,23 @@ const inheritedSummary = stageId => {
   return t('CRM_KANBAN.HANDOFF_DRAWER.INHERITED_SUMMARY', { status, flow });
 };
 
+const stageHandoffPayload = form =>
+  form.custom
+    ? {
+        custom: true,
+        enabled: form.enabled,
+        mode: form.mode,
+        handoff_mode: form.handoff_mode,
+        trigger: form.trigger,
+        prefer_online: form.prefer_online,
+        pickup_threshold_seconds: form.pickup_threshold_seconds,
+        escalation_user_id: form.escalation_user_id,
+        pool_type: form.pool_type,
+        pool_id: form.pool_id,
+        escalation_action: form.escalation_action,
+      }
+    : { custom: false };
+
 const saveSettings = async () => {
   if (!props.pipelineId) return;
   isSaving.value = true;
@@ -132,18 +141,7 @@ const saveSettings = async () => {
     const stageHandoff = Object.fromEntries(
       Object.entries(stageForms).map(([stageId, form]) => [
         stageId,
-        form.custom
-          ? {
-              custom: true,
-              enabled: form.enabled,
-              mode: form.mode,
-              handoff_mode: form.handoff_mode,
-              trigger: form.trigger,
-              prefer_online: form.prefer_online,
-              pickup_threshold_seconds: form.pickup_threshold_seconds,
-              escalation_user_id: form.escalation_user_id,
-            }
-          : { custom: false },
+        stageHandoffPayload(form),
       ])
     );
     await CrmKanbanAPI.updateAiSettings(props.pipelineId, {
@@ -225,104 +223,10 @@ useKeyboardEvents({
               </p>
             </div>
 
-            <label class="flex items-center gap-2 text-sm text-n-slate-12">
-              <input
-                v-model="defaultHandoff.enabled"
-                type="checkbox"
-                class="rounded border-n-weak"
-              />
-              {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.ENABLED') }}
-            </label>
-
-            <template v-if="defaultHandoff.enabled">
-              <label class="flex items-center gap-2 text-xs text-n-slate-11">
-                {{ t('CRM_KANBAN.HANDOFF_DRAWER.FLOW_MODE') }}
-                <select
-                  v-model="defaultHandoff.handoff_mode"
-                  class="reset-base rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                >
-                  <option v-for="flow in FLOW_MODES" :key="flow" :value="flow">
-                    {{
-                      t(
-                        `CRM_KANBAN.HANDOFF_DRAWER.FLOW_MODE_${flow.toUpperCase()}`
-                      )
-                    }}
-                  </option>
-                </select>
-              </label>
-
-              <textarea
-                v-model="defaultHandoff.trigger"
-                rows="2"
-                class="reset-base w-full rounded-lg border-0 bg-n-surface-2 px-3 py-2 text-sm text-n-slate-12 outline outline-1 outline-n-weak"
-                :placeholder="
-                  t('CRM_KANBAN.AI_SETTINGS.HANDOFF.TRIGGER_PLACEHOLDER')
-                "
-              />
-
-              <div class="flex flex-wrap items-center gap-4">
-                <label class="flex items-center gap-2 text-xs text-n-slate-11">
-                  {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.MODE') }}
-                  <select
-                    v-model="defaultHandoff.mode"
-                    class="reset-base rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                  >
-                    <option
-                      v-for="mode in SELECTOR_MODES"
-                      :key="mode"
-                      :value="mode"
-                    >
-                      {{
-                        t(
-                          `CRM_KANBAN.AI_SETTINGS.HANDOFF.MODE_${mode.toUpperCase()}`
-                        )
-                      }}
-                    </option>
-                  </select>
-                </label>
-                <label class="flex items-center gap-2 text-xs text-n-slate-11">
-                  <input
-                    v-model="defaultHandoff.prefer_online"
-                    type="checkbox"
-                    class="rounded border-n-weak"
-                  />
-                  {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.PREFER_ONLINE') }}
-                </label>
-              </div>
-
-              <div
-                v-if="defaultHandoff.handoff_mode === 'r3_invite'"
-                class="flex flex-wrap items-center gap-4"
-              >
-                <label class="flex items-center gap-2 text-xs text-n-slate-11">
-                  {{ t('CRM_KANBAN.HANDOFF_DRAWER.PICKUP_THRESHOLD_MINUTES') }}
-                  <input
-                    v-model="defaultPickupThresholdMinutes"
-                    type="number"
-                    min="1"
-                    class="reset-base w-20 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                  />
-                </label>
-                <label class="flex items-center gap-2 text-xs text-n-slate-11">
-                  {{ t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER') }}
-                  <select
-                    v-model="defaultHandoff.escalation_user_id"
-                    class="reset-base max-w-52 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                  >
-                    <option :value="null">
-                      {{ t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER_NONE') }}
-                    </option>
-                    <option
-                      v-for="agent in agentOptions"
-                      :key="agent.value"
-                      :value="agent.value"
-                    >
-                      {{ agent.label }}
-                    </option>
-                  </select>
-                </label>
-              </div>
-            </template>
+            <CrmHandoffFields
+              v-model="defaultHandoff"
+              :agent-options="agentOptions"
+            />
           </section>
 
           <section class="grid gap-3">
@@ -376,130 +280,11 @@ useKeyboardEvents({
                 {{ inheritedSummary(stage.id) }}
               </p>
 
-              <template v-else>
-                <label class="flex items-center gap-2 text-xs text-n-slate-12">
-                  <input
-                    v-model="stageForms[stage.id].enabled"
-                    type="checkbox"
-                    class="rounded border-n-weak"
-                  />
-                  {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.ENABLED') }}
-                </label>
-
-                <template v-if="stageForms[stage.id].enabled">
-                  <label
-                    class="flex items-center gap-2 text-xs text-n-slate-11"
-                  >
-                    {{ t('CRM_KANBAN.HANDOFF_DRAWER.FLOW_MODE') }}
-                    <select
-                      v-model="stageForms[stage.id].handoff_mode"
-                      class="reset-base rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                    >
-                      <option
-                        v-for="flow in FLOW_MODES"
-                        :key="flow"
-                        :value="flow"
-                      >
-                        {{
-                          t(
-                            `CRM_KANBAN.HANDOFF_DRAWER.FLOW_MODE_${flow.toUpperCase()}`
-                          )
-                        }}
-                      </option>
-                    </select>
-                  </label>
-
-                  <textarea
-                    v-model="stageForms[stage.id].trigger"
-                    rows="2"
-                    class="reset-base w-full rounded-lg border-0 bg-n-surface-2 px-3 py-2 text-sm text-n-slate-12 outline outline-1 outline-n-weak"
-                    :placeholder="
-                      t('CRM_KANBAN.AI_SETTINGS.HANDOFF.TRIGGER_PLACEHOLDER')
-                    "
-                  />
-
-                  <div class="flex flex-wrap items-center gap-4">
-                    <label
-                      class="flex items-center gap-2 text-xs text-n-slate-11"
-                    >
-                      {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.MODE') }}
-                      <select
-                        v-model="stageForms[stage.id].mode"
-                        class="reset-base rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                      >
-                        <option
-                          v-for="mode in SELECTOR_MODES"
-                          :key="mode"
-                          :value="mode"
-                        >
-                          {{
-                            t(
-                              `CRM_KANBAN.AI_SETTINGS.HANDOFF.MODE_${mode.toUpperCase()}`
-                            )
-                          }}
-                        </option>
-                      </select>
-                    </label>
-                    <label
-                      class="flex items-center gap-2 text-xs text-n-slate-11"
-                    >
-                      <input
-                        v-model="stageForms[stage.id].prefer_online"
-                        type="checkbox"
-                        class="rounded border-n-weak"
-                      />
-                      {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.PREFER_ONLINE') }}
-                    </label>
-                  </div>
-
-                  <div
-                    v-if="stageForms[stage.id].handoff_mode === 'r3_invite'"
-                    class="flex flex-wrap items-center gap-4"
-                  >
-                    <label
-                      class="flex items-center gap-2 text-xs text-n-slate-11"
-                    >
-                      {{
-                        t('CRM_KANBAN.HANDOFF_DRAWER.PICKUP_THRESHOLD_MINUTES')
-                      }}
-                      <input
-                        :value="pickupThresholdMinutes(stageForms[stage.id])"
-                        type="number"
-                        min="1"
-                        class="reset-base w-20 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                        @input="
-                          updatePickupThresholdMinutes(
-                            stageForms[stage.id],
-                            $event.target.value
-                          )
-                        "
-                      />
-                    </label>
-                    <label
-                      class="flex items-center gap-2 text-xs text-n-slate-11"
-                    >
-                      {{ t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER') }}
-                      <select
-                        v-model="stageForms[stage.id].escalation_user_id"
-                        class="reset-base max-w-52 rounded-lg border-0 bg-n-surface-2 px-2 py-1 text-xs text-n-slate-12 outline outline-1 outline-n-weak"
-                      >
-                        <option :value="null">
-                          {{
-                            t('CRM_KANBAN.HANDOFF_DRAWER.ESCALATION_USER_NONE')
-                          }}
-                        </option>
-                        <option
-                          v-for="agent in agentOptions"
-                          :key="agent.value"
-                          :value="agent.value"
-                        >
-                          {{ agent.label }}
-                        </option>
-                      </select>
-                    </label>
-                  </div>
-                </template>
-              </template>
+              <CrmHandoffFields
+                v-else
+                v-model="stageForms[stage.id]"
+                :agent-options="agentOptions"
+              />
             </div>
           </section>
         </div>

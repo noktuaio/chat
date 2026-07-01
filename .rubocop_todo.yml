@@ -241,6 +241,7 @@ Metrics/ClassLength:
   Exclude:
     - 'app/controllers/api/v1/accounts/crm/cards_controller.rb'
     - 'app/controllers/api/v1/accounts/crm/meetings_controller.rb'
+    - 'app/jobs/crm/ai/handoff_escalation_job.rb'
     - 'app/models/account.rb'
     - 'app/models/contact.rb'
     - 'app/models/email_campaign.rb'
@@ -251,6 +252,7 @@ Metrics/ClassLength:
     - 'app/services/autonomia/agents/operate/responder.rb'
     - 'app/services/autonomia/agents/prompt_builder.rb'
     - 'app/services/campaign_imports/validator.rb'
+    - 'app/services/crm/ai/config.rb'
     - 'app/services/crm/ai/follow_up_composer.rb'
     - 'app/services/crm/ai/responses_client.rb'
     - 'app/services/crm/calendar/public_booking_service.rb'
