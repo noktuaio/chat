@@ -28,6 +28,7 @@ class Crm::ConversationObserverListener < BaseListener
     return if conversation&.id.blank?
 
     Crm::SyncConversationCardJob.perform_later(conversation.id)
+    enqueue_handoff_pickup(conversation, event)
   end
 
   # Keep the card's team in sync on a team-only reassignment (e.g. an Autonomia
@@ -45,6 +46,15 @@ class Crm::ConversationObserverListener < BaseListener
   end
 
   private
+
+  # Telemetria de pega do convite R3 (só quando IA está ligada; o job é no-op
+  # barato se não houver convite pendente). Passa snapshot do evento (assignee +
+  # hora) para não medir o atraso da fila nem creditar reatribuição posterior.
+  def enqueue_handoff_pickup(conversation, event)
+    return unless Crm::Ai::Config.enabled?
+
+    Crm::Ai::HandoffPickupJob.perform_later(conversation.id, conversation.assignee_id, event.timestamp.iso8601)
+  end
 
   def ignored_message?(message)
     message.blank? ||
