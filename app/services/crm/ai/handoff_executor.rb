@@ -6,6 +6,8 @@ module Crm
     # guards below MUST short-circuit before any side effect.
     class HandoffExecutor
       Result = Struct.new(:status, :assignee, :error, keyword_init: true)
+      # Limita o histórico R3 por card para evitar crescimento indefinido do JSONB.
+      HANDOFF_CYCLES_CAP = 20
 
       def initialize(card:, handoff:, trigger: 'message')
         @card = card
@@ -174,7 +176,10 @@ module Crm
       def append_invite_cycle(ai_meta, now)
         cycles = supersede_open_cycles(normalized_cycles(ai_meta), now)
         cycle = { 'cycle_id' => next_cycle_id(cycles), 'invited_at' => now }
-        ai_meta.merge('handoffs' => cycles + [cycle], 'handoff' => cycle)
+        # O ponteiro sempre referencia o ciclo recém-criado; manter a cauda preserva
+        # esse ciclo e descarta apenas histórico antigo já fora da janela operacional.
+        capped_cycles = (cycles + [cycle]).last(HANDOFF_CYCLES_CAP)
+        ai_meta.merge('handoffs' => capped_cycles, 'handoff' => cycle)
       end
 
       # Semeia a lista a partir do blob legado (convite gravado antes do array) para
@@ -191,7 +196,7 @@ module Crm
 
       def supersede_open_cycles(cycles, now)
         cycles.map do |cycle|
-          open = cycle['picked_up_at'].blank? && cycle['canceled_at'].blank?
+          open = cycle['picked_up_at'].blank? && cycle['canceled_at'].blank? && cycle['expired_at'].blank?
           open ? cycle.merge('canceled_at' => now) : cycle
         end
       end

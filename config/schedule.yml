@@ -93,6 +93,12 @@ crm_ai_stale_cards_job:
   class: 'Crm::Ai::StaleCardsJob'
   queue: scheduled_jobs
 
+# executed every 15 minutes; marks stale R3 invite cycles as expired
+crm_ai_handoff_expiry_job:
+  cron: '*/15 * * * *'
+  class: 'Crm::Ai::HandoffExpiryJob'
+  queue: scheduled_jobs
+
 # executed hourly; prunes idempotency keys past their 24h TTL
 crm_idempotency_keys_cleanup_job:
   cron: '15 * * * *'
