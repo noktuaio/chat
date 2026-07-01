@@ -46,12 +46,7 @@ class Crm::Ai::HandoffPickupRecorder
     card.with_lock do
       handoff = card_handoff(card)
       invited_at = parse_time(handoff['invited_at'])
-      next if invited_at.blank?
-      next if handoff['escalated_at'].present?
-
-      # Ciclo fechado (cancelado por novo convite ou expirado por TTL) não recebe
-      # pega: atribuição depois do fechamento é ação nova, não pega daquele convite.
-      next if handoff['canceled_at'].present? || handoff['expired_at'].present?
+      next if invited_at.blank? || closed_cycle?(handoff)
 
       existing = parse_time(handoff['picked_up_at'])
       next if existing.present? && existing <= @picked_up_at
@@ -62,6 +57,14 @@ class Crm::Ai::HandoffPickupRecorder
       stamp!(card, handoff, wall, business)
       log!(card, wall, business) if existing.blank?
     end
+  end
+
+  # Ciclo fechado (escalado, cancelado por novo convite ou expirado por TTL) não
+  # recebe pega: atribuição depois do fechamento é ação nova, não pega do convite.
+  def closed_cycle?(handoff)
+    handoff['escalated_at'].present? ||
+      handoff['canceled_at'].present? ||
+      handoff['expired_at'].present?
   end
 
   # Segundos úteis dentro da agenda do AGENTE que pegou (owner=User). Sem agenda
