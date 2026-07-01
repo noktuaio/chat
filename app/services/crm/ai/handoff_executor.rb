@@ -16,7 +16,7 @@ module Crm
 
       def perform
         blocked = blocked_reason
-        return skip(blocked) if blocked
+        return skip_blocked(blocked) if blocked
 
         if invite_mode?
           agent = select_agent(require_online: false)
@@ -161,6 +161,7 @@ module Crm
         metadata = (@card.metadata || {}).deep_dup
         now = Time.current.iso8601
         ai = (metadata['ai'] || {}).merge('last_handoff_at' => now)
+        ai.delete('handoff_hold')
         ai = append_invite_cycle(ai, now) if invited
         metadata['ai'] = ai
         @card.update!(metadata: metadata)
@@ -218,8 +219,45 @@ module Crm
         Result.new(status: :skipped, error: reason)
       end
 
+      def skip_blocked(reason)
+        # Cooldown é transitório: mantém o marcador para o drain retentar depois
+        # da janela. Os demais motivos são terminais ou refletem a intenção atual
+        # do cliente, então limpam o hold órfão.
+        clear_handoff_hold! unless reason == 'cooldown'
+        skip(reason)
+      end
+
       def hold_online
+        stamp_handoff_hold!
         Result.new(status: :held_online, error: 'no_online_agent')
+      end
+
+      # R2 drain: "segurar online" NÃO é handoff — não atribui, não cala bot e
+      # não grava cooldown. Persiste só o payload normalizado para o cron tentar
+      # novamente a MESMA seleção quando alguém ficar online, sem chamar IA de novo.
+      def stamp_handoff_hold!
+        metadata = (@card.metadata || {}).deep_dup
+        previous_hold = metadata.dig('ai', 'handoff_hold') || {}
+        ai = (metadata['ai'] || {}).merge(
+          'handoff_hold' => {
+            'held_at' => previous_hold['held_at'].presence || Time.current.iso8601,
+            'handoff' => @handoff.to_h
+          }
+        )
+        metadata['ai'] = ai
+        @card.update!(metadata: metadata)
+      end
+
+      # Limpa marcador órfão quando o card deixou de ser drenável (atribuído,
+      # sem conversa, config desligada etc.) ou quando o assign efetivo já gravou
+      # o handoff. Sem isso o cron continuaria varrendo lixo sem chance de ação.
+      def clear_handoff_hold!
+        metadata = (@card.metadata || {}).deep_dup
+        ai = metadata['ai'] || {}
+        return unless ai.key?('handoff_hold')
+
+        metadata['ai'] = ai.except('handoff_hold')
+        @card.update!(metadata: metadata)
       end
     end
   end

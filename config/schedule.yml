@@ -93,6 +93,12 @@ crm_ai_stale_cards_job:
   class: 'Crm::Ai::StaleCardsJob'
   queue: scheduled_jobs
 
+# executed every 2 minutes; assigns R2 held cards once an agent comes online
+crm_ai_handoff_drain_job:
+  cron: '*/2 * * * *'
+  class: 'Crm::Ai::HandoffDrainJob'
+  queue: scheduled_jobs
+
 # executed hourly; prunes idempotency keys past their 24h TTL
 crm_idempotency_keys_cleanup_job:
   cron: '15 * * * *'
