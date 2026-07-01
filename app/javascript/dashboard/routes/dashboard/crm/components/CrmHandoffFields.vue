@@ -151,10 +151,16 @@ const setEscalationAction = action => {
         {{ t('CRM_KANBAN.AI_SETTINGS.HANDOFF.PREFER_ONLINE') }}
       </label>
       <p
-        v-if="form.prefer_online"
+        v-if="form.prefer_online && form.handoff_mode === 'r3_invite'"
         class="mb-0 ltr:pl-6 rtl:pr-6 text-xs leading-5 text-n-slate-10"
       >
-        {{ t('CRM_KANBAN.HANDOFF_DRAWER.PREFER_ONLINE_HINT') }}
+        {{ t('CRM_KANBAN.HANDOFF_DRAWER.PREFER_ONLINE_HINT_INVITE') }}
+      </p>
+      <p
+        v-else-if="form.prefer_online"
+        class="mb-0 ltr:pl-6 rtl:pr-6 text-xs leading-5 text-n-slate-10"
+      >
+        {{ t('CRM_KANBAN.HANDOFF_DRAWER.PREFER_ONLINE_HINT_DIRECT') }}
       </p>
     </div>
 
